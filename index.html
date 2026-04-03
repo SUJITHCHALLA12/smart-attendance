@@ -260,6 +260,33 @@
             transition: all 0.3s;
             color: var(--text-light);
             font-family: inherit;
+            position: relative;
+        }
+
+        .excuse-badge {
+            position: absolute;
+            top: -7px;
+            right: -7px;
+            background: #ff4d6d;
+            color: #fff;
+            border-radius: 50%;
+            min-width: 20px;
+            height: 20px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+            border: 2px solid var(--bg);
+            box-shadow: 0 0 8px rgba(255, 77, 109, 0.7);
+            animation: badge-pulse 2s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes badge-pulse {
+            0%, 100% { box-shadow: 0 0 8px rgba(255, 77, 109, 0.7); }
+            50% { box-shadow: 0 0 18px rgba(255, 77, 109, 1); }
         }
 
         .tab.active {
@@ -1081,7 +1108,7 @@
                 <div class="tabs">
                     <button class="tab active" onclick="switchTab('mark')">📋 Mark Attendance</button>
                     <button class="tab" onclick="switchTab('monthly')">📊 Monthly Report</button>
-                    <button class="tab" onclick="switchTab('excuses')">📨 Excuses</button>
+                    <button class="tab" id="excusesTabBtn" onclick="switchTab('excuses')">📨 Excuses</button>
                 </div>
             </div>
 
@@ -1383,6 +1410,19 @@
 
         const MAX_STUDENTS = 100;
         const FIREBASE_DATA_PATH = 'attendance-app/main';
+        const FIREBASE_SDK_VERSION = '10.13.2';
+        const FIREBASE_COMPAT_SOURCES = [
+            [
+                `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-app-compat.js`,
+                `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-database-compat.js`,
+                `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-auth-compat.js`
+            ],
+            [
+                `https://cdn.jsdelivr.net/npm/firebase@${FIREBASE_SDK_VERSION}/firebase-app-compat.js`,
+                `https://cdn.jsdelivr.net/npm/firebase@${FIREBASE_SDK_VERSION}/firebase-database-compat.js`,
+                `https://cdn.jsdelivr.net/npm/firebase@${FIREBASE_SDK_VERSION}/firebase-auth-compat.js`
+            ]
+        ];
         // Firebase Realtime Database rules to apply in the Firebase console:
         // {
         //   "rules": {
@@ -1423,6 +1463,8 @@
         let authClient = null;
         let saveTimer = null;
         let isApplyingRemoteUpdate = false;
+        let pendingPush = false;
+        let firebaseSdkPromise = null;
 
         function normalizeData(raw = {}) {
             const base = createDefaultData();
@@ -1473,23 +1515,114 @@
                 && firebaseConfig.databaseURL.includes('https://');
         }
 
-        function initializeFirebase() {
+        function getFirebaseNamespace() {
+            return window.firebase || globalThis.firebase || null;
+        }
+
+        function isFirebaseReady(firebaseNamespace = getFirebaseNamespace()) {
+            return Boolean(
+                firebaseNamespace
+                && Array.isArray(firebaseNamespace.apps)
+                && typeof firebaseNamespace.initializeApp === 'function'
+                && typeof firebaseNamespace.database === 'function'
+                && typeof firebaseNamespace.auth === 'function'
+            );
+        }
+
+        function loadFirebaseScript(src) {
+            return new Promise((resolve, reject) => {
+                const existingScript = Array.from(document.scripts).find(script => script.src === src);
+                if (existingScript) {
+                    if (isFirebaseReady()) {
+                        resolve();
+                        return;
+                    }
+
+                    existingScript.remove();
+                }
+
+                const script = document.createElement('script');
+                script.src = src;
+                script.async = false;
+                script.dataset.firebaseSdk = src;
+                script.addEventListener('load', () => {
+                    script.dataset.firebaseLoaded = 'true';
+                    resolve();
+                }, { once: true });
+                script.addEventListener('error', () => {
+                    script.remove();
+                    reject(new Error(`Failed to load ${src}`));
+                }, { once: true });
+                document.head.appendChild(script);
+            });
+        }
+
+        async function ensureFirebaseSdk() {
+            const existingFirebase = getFirebaseNamespace();
+            if (isFirebaseReady(existingFirebase)) {
+                return existingFirebase;
+            }
+
+            if (firebaseSdkPromise) {
+                return firebaseSdkPromise;
+            }
+
+            firebaseSdkPromise = (async () => {
+                let lastError = null;
+
+                for (const sourceGroup of FIREBASE_COMPAT_SOURCES) {
+                    try {
+                        for (const src of sourceGroup) {
+                            await loadFirebaseScript(src);
+                        }
+
+                        const firebaseNamespace = getFirebaseNamespace();
+                        if (isFirebaseReady(firebaseNamespace)) {
+                            return firebaseNamespace;
+                        }
+                    } catch (error) {
+                        lastError = error;
+                    }
+                }
+
+                throw lastError || new Error('Firebase SDK failed to load');
+            })().catch(error => {
+                firebaseSdkPromise = null;
+                throw error;
+            });
+
+            return firebaseSdkPromise;
+        }
+
+        async function initializeFirebase() {
             if (!hasFirebaseConfig()) {
                 updateSyncStatus('Add Firebase Config', true);
                 return false;
             }
 
-            if (!window.firebase) {
+            let firebaseNamespace = getFirebaseNamespace();
+
+            if (!isFirebaseReady(firebaseNamespace)) {
+                try {
+                    firebaseNamespace = await ensureFirebaseSdk();
+                } catch (error) {
+                    console.error(error);
+                    updateSyncStatus('Firebase SDK Missing', true);
+                    return false;
+                }
+            }
+
+            if (!isFirebaseReady(firebaseNamespace)) {
                 updateSyncStatus('Firebase SDK Missing', true);
                 return false;
             }
 
-            if (!firebase.apps.length) {
-                firebase.initializeApp(firebaseConfig);
+            if (!firebaseNamespace.apps.length) {
+                firebaseNamespace.initializeApp(firebaseConfig);
             }
 
-            database = firebase.database();
-            authClient = firebase.auth();
+            database = firebaseNamespace.database();
+            authClient = firebaseNamespace.auth();
             cloudRef = database.ref(FIREBASE_DATA_PATH);
             return true;
         }
@@ -1497,7 +1630,7 @@
         async function startRealtimeSync() {
             updateSyncStatus('Connecting...');
 
-            if (!initializeFirebase()) {
+            if (!await initializeFirebase()) {
                 return;
             }
 
@@ -1515,8 +1648,13 @@
                     data = normalizeData(liveSnapshot.val());
                     populateRollNumbers();
                     refreshCurrentView();
+                    updateExcuseBadge();
                     isApplyingRemoteUpdate = false;
                     updateSyncStatus('Realtime Sync Active');
+                    if (pendingPush) {
+                        pendingPush = false;
+                        pushDataToCloud();
+                    }
                 }, () => {
                     updateSyncStatus('Sync Error', true);
                 });
@@ -1568,10 +1706,17 @@
             if (document.getElementById('manageStudentsModal').classList.contains('active')) {
                 renderManageStudentsList(document.getElementById('manageSearchInput').value);
             }
+
+            updateExcuseBadge();
         }
 
         async function pushDataToCloud() {
-            if (!cloudRef || isApplyingRemoteUpdate) return;
+            if (!cloudRef) return;
+            if (isApplyingRemoteUpdate) {
+                pendingPush = true;
+                return;
+            }
+            pendingPush = false;
 
             try {
                 data = normalizeData(data);
@@ -1734,6 +1879,7 @@
                 document.getElementById('calendarBtn').classList.remove('hidden');
                 document.getElementById('downloadOptions').classList.remove('hidden');
                 switchTab('mark');
+                updateExcuseBadge();
             } else {
                 document.getElementById('dashboardTitle').textContent = `Student Dashboard - ${currentUser.roll}`;
                 document.getElementById('crControls').classList.add('hidden');
@@ -2536,7 +2682,7 @@
             document.getElementById(id).classList.remove('active');
         }
 
-        function submitExcuse() {
+        async function submitExcuse() {
             const roll = currentUser.type === 'student' ? currentUser.roll : prompt('Enter roll number:');
             if (!roll) return;
 
@@ -2548,19 +2694,36 @@
                 return;
             }
 
-            data.excuses.push({
+            const newExcuse = {
                 id: Date.now(),
                 roll: roll,
                 date: date,
                 reason: reason,
                 time: new Date().toLocaleString(),
                 status: 'pending'
-            });
+            };
 
-            saveToStorage();
+            data.excuses.push(newExcuse);
             closeModal('excuseModal');
-            showToast('✅ Excuse submitted!');
             renderExcuses();
+            updateExcuseBadge();
+
+            // Push directly to Firebase without debounce to prevent race condition
+            if (cloudRef) {
+                try {
+                    updateSyncStatus('Syncing...');
+                    const payload = JSON.parse(JSON.stringify(normalizeData(data)));
+                    await cloudRef.set(payload);
+                    updateSyncStatus('Realtime Sync Active');
+                    showToast('✅ Excuse submitted!');
+                } catch (error) {
+                    console.error(error);
+                    updateSyncStatus('Sync Error', true);
+                    showToast('✅ Excuse saved locally (sync failed)');
+                }
+            } else {
+                showToast('✅ Excuse submitted!');
+            }
         }
 
         function renderExcuses() {
@@ -2603,7 +2766,28 @@
                 excuse.status = status;
                 saveToStorage();
                 renderExcuses();
+                updateExcuseBadge();
                 showToast(`Excuse ${status}!`);
+            }
+        }
+
+        function updateExcuseBadge() {
+            const btn = document.getElementById('excusesTabBtn');
+            if (!btn) return;
+            // Only show badge for admin users (CR / Teacher)
+            if (!isAdminUser()) return;
+
+            const pendingCount = data.excuses.filter(e => e.status === 'pending').length;
+
+            // Remove existing badge if any
+            const existing = btn.querySelector('.excuse-badge');
+            if (existing) existing.remove();
+
+            if (pendingCount > 0) {
+                const badge = document.createElement('span');
+                badge.className = 'excuse-badge';
+                badge.textContent = pendingCount > 99 ? '99+' : pendingCount;
+                btn.appendChild(badge);
             }
         }
 
