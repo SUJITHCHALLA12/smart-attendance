@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Attendance</title>
+    <title>Attendance Management System</title>
     <style>
         * {
             margin: 0;
@@ -300,6 +300,36 @@
             color: var(--primary);
         }
 
+        .sub-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .sub-tab {
+            padding: 10px 18px;
+            background: rgba(7, 18, 12, 0.96);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            color: var(--text);
+            font-family: inherit;
+        }
+
+        .sub-tab.active {
+            background: linear-gradient(135deg, rgba(8, 28, 17, 0.98), rgba(10, 45, 26, 0.98));
+            color: var(--primary);
+            box-shadow: 0 0 18px rgba(25, 245, 138, 0.14);
+        }
+
+        .sub-tab:hover {
+            background: rgba(10, 30, 18, 0.96);
+            color: var(--primary);
+        }
+
         .date-selector-card {
             background: linear-gradient(135deg, rgba(6, 24, 14, 0.98), rgba(9, 36, 21, 0.96));
             padding: 25px;
@@ -585,6 +615,11 @@
             background: rgba(8, 22, 15, 0.92);
         }
 
+        .attendance-item.period-row {
+            align-items: flex-start;
+            gap: 16px;
+        }
+
         .student-info {
             display: flex;
             align-items: center;
@@ -638,6 +673,35 @@
             background: rgba(88, 42, 8, 0.95);
             color: #ffd28a;
             border-color: var(--warning);
+        }
+
+        .period-wise-controls {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 10px;
+        }
+
+        .period-card {
+            background: rgba(4, 12, 8, 0.94);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .period-card-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .period-summary {
+            color: var(--text-light);
+            font-size: 0.85rem;
+            margin-top: 8px;
         }
 
         .stats-grid {
@@ -929,6 +993,41 @@
             font-weight: 600;
         }
 
+        .period-count-btn {
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(25, 245, 138, 0.24);
+            background: rgba(8, 28, 17, 0.98);
+            color: var(--primary);
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 700;
+        }
+
+        .period-count-btn:hover {
+            background: rgba(10, 40, 24, 0.98);
+        }
+
+        .period-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        .period-detail-card {
+            background: rgba(6, 18, 12, 0.94);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+            box-shadow: var(--shadow);
+        }
+
+        .period-detail-card h4 {
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
         .download-options {
             display: flex;
             gap: 15px;
@@ -1075,6 +1174,7 @@
                     <option value="student">Student</option>
                     <option value="cr">Class Representative (CR)</option>
                     <option value="teacher">Class Teacher</option>
+                    <option value="faculty">Faculty</option>
                 </select>
             </div>
             <div class="form-group" id="rollNumberGroup">
@@ -1124,30 +1224,41 @@
 
             <!-- CR Mark Attendance Tab -->
             <div id="markTab">
+                <div class="sub-tabs">
+                    <button class="sub-tab active" id="markRegularTabBtn" onclick="setAttendanceMode('regular')">Regular</button>
+                    <button class="sub-tab" id="markPeriodTabBtn" onclick="setAttendanceMode('period')">Period-wise</button>
+                </div>
+
                 <div class="date-selector-card">
                     <div>
                         <h3>Mark Attendance</h3>
-                        <p style="opacity: 0.8;">Select date to mark attendance</p>
+                        <p style="opacity: 0.8;" id="attendanceModeNote">Select date to mark regular attendance</p>
                     </div>
                     <input type="date" id="attendanceDate" onchange="changeAttendanceDate()">
+                </div>
+
+                <div class="today-status-card" id="regularSessionCard" style="display: none; text-align: left;">
+                    <h4>Regular Attendance Session</h4>
+                    <div id="regularSessionStatus" class="status-big no-record" style="min-width: 0; width: 100%; text-align: center;">SESSION CLOSED</div>
+                    <p id="regularSessionNote" style="margin-top: 15px; color: var(--text-light);"></p>
                 </div>
 
                 <div class="stats-grid">
                     <div class="stat-card">
                         <h3 id="totalCount">0</h3>
-                        <p>Total Students</p>
+                        <p id="totalCountLabel">Total Students</p>
                     </div>
                     <div class="stat-card" style="background: linear-gradient(135deg, rgba(8, 36, 19, 0.98), rgba(10, 55, 28, 0.98)); color: var(--accent);">
                         <h3 id="presentCount">0</h3>
-                        <p>Present</p>
+                        <p id="presentCountLabel">Present</p>
                     </div>
                     <div class="stat-card" style="background: linear-gradient(135deg, rgba(48, 10, 18, 0.98), rgba(80, 12, 28, 0.98)); color: #ff9aad;">
                         <h3 id="absentCount">0</h3>
-                        <p>Absent</p>
+                        <p id="absentCountLabel">Absent</p>
                     </div>
                     <div class="stat-card" style="background: linear-gradient(135deg, rgba(52, 26, 6, 0.98), rgba(86, 42, 8, 0.98)); color: #ffd28a;">
                         <h3 id="lateCount">0</h3>
-                        <p>Late</p>
+                        <p id="lateCountLabel">Late</p>
                     </div>
                 </div>
 
@@ -1161,11 +1272,22 @@
                     <button class="btn btn-primary btn-sm" onclick="saveAttendance()">💾 Save Attendance</button>
                 </div>
 
-                <div class="attendance-list" id="attendanceList"></div>
+                <div id="regularAttendanceSection">
+                    <div class="attendance-list" id="attendanceList"></div>
+                </div>
+
+                <div id="periodAttendanceSection" class="hidden">
+                    <div class="attendance-list" id="periodAttendanceList"></div>
+                </div>
             </div>
 
             <!-- Student Today's Attendance Tab -->
             <div id="studentTodayTab" class="hidden">
+                <div class="sub-tabs">
+                    <button class="sub-tab active" id="studentTodayRegularTabBtn" onclick="setStudentTodayMode('regular')">Regular</button>
+                    <button class="sub-tab" id="studentTodayPeriodTabBtn" onclick="setStudentTodayMode('period')">Period-wise</button>
+                </div>
+
                 <div class="date-selector-card">
                     <div>
                         <h3>Select Date</h3>
@@ -1178,11 +1300,17 @@
                     <h4 id="studentDateTitle">Today's Attendance</h4>
                     <div id="studentTodayStatus" class="status-big no-record">NO RECORD</div>
                     <p id="studentTodayNote" style="margin-top: 15px; color: var(--text-light);"></p>
+                    <div id="studentTodayPeriodDetails" class="period-detail-grid hidden" style="margin-top: 18px;"></div>
                 </div>
             </div>
 
             <!-- Student Weekly View Tab -->
             <div id="studentWeeklyTab" class="hidden">
+                <div class="sub-tabs">
+                    <button class="sub-tab active" id="studentWeeklyRegularTabBtn" onclick="setStudentWeeklyMode('regular')">Regular</button>
+                    <button class="sub-tab" id="studentWeeklyPeriodTabBtn" onclick="setStudentWeeklyMode('period')">Period-wise</button>
+                </div>
+
                 <div class="month-selector">
                     <h3 id="weeklyTitle">This Week</h3>
                     <div class="calendar-nav">
@@ -1198,6 +1326,11 @@
 
             <!-- Monthly Report Tab (Both CR and Student) -->
             <div id="monthlyTab" class="hidden">
+                <div class="sub-tabs">
+                    <button class="sub-tab active" id="monthlyRegularTabBtn" onclick="setMonthlyMode('regular')">Regular</button>
+                    <button class="sub-tab" id="monthlyPeriodTabBtn" onclick="setMonthlyMode('period')">Period-wise</button>
+                </div>
+
                 <div class="month-selector">
                     <h3 id="monthlyTitle">March 2026</h3>
                     <div class="calendar-nav">
@@ -1209,19 +1342,19 @@
                 <div class="stats-grid" id="monthlyStatsGrid">
                     <div class="stat-card">
                         <h3 id="monthlyTotalDays">0</h3>
-                        <p>Days Recorded</p>
+                        <p id="monthlyTotalDaysLabel">Days Recorded</p>
                     </div>
                     <div class="stat-card" style="background: linear-gradient(135deg, rgba(8, 36, 19, 0.98), rgba(10, 55, 28, 0.98)); color: var(--accent);">
                         <h3 id="monthlyTotalPresent">0</h3>
-                        <p>Total Present</p>
+                        <p id="monthlyTotalPresentLabel">Total Present</p>
                     </div>
                     <div class="stat-card" style="background: linear-gradient(135deg, rgba(48, 10, 18, 0.98), rgba(80, 12, 28, 0.98)); color: #ff9aad;">
                         <h3 id="monthlyTotalAbsent">0</h3>
-                        <p>Total Absent</p>
+                        <p id="monthlyTotalAbsentLabel">Total Absent</p>
                     </div>
                     <div class="stat-card" style="background: linear-gradient(135deg, rgba(52, 26, 6, 0.98), rgba(86, 42, 8, 0.98)); color: #ffd28a;">
                         <h3 id="monthlyAvgAttendance">0%</h3>
-                        <p>Avg Attendance</p>
+                        <p id="monthlyAvgAttendanceLabel">Avg Attendance</p>
                     </div>
                 </div>
 
@@ -1300,6 +1433,16 @@
             <div style="margin-top: 15px;">
                 <button class="btn btn-secondary btn-sm" onclick="resetToDefaultStudents()">🔄 Reset to Default List</button>
             </div>
+        </div>
+    </div>
+
+    <div class="modal" id="periodDetailsModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3 id="periodDetailsTitle">Period-wise Attendance</h3>
+                <button class="close-btn" onclick="closeModal('periodDetailsModal')">&times;</button>
+            </div>
+            <div id="periodDetailsContent"></div>
         </div>
     </div>
 
@@ -1409,6 +1552,20 @@
         }();
 
         const MAX_STUDENTS = 100;
+        const PERIOD_COUNT = 7;
+        const REGULAR_SESSION_START_HOUR = 9;
+        const REGULAR_SESSION_START_MINUTE = 15;
+        const REGULAR_SESSION_END_HOUR = 10;
+        const REGULAR_SESSION_END_MINUTE = 15;
+        const PERIOD_SESSION_SCHEDULE = [
+            { label: 'P1', startHour: 9, startMinute: 25, endHour: 10, endMinute: 15 },
+            { label: 'P2', startHour: 10, startMinute: 15, endHour: 11, endMinute: 5 },
+            { label: 'P3', startHour: 11, startMinute: 20, endHour: 12, endMinute: 10 },
+            { label: 'P4', startHour: 12, startMinute: 10, endHour: 13, endMinute: 0 },
+            { label: 'P5', startHour: 13, startMinute: 45, endHour: 14, endMinute: 35 },
+            { label: 'P6', startHour: 14, startMinute: 35, endHour: 15, endMinute: 25 },
+            { label: 'P7', startHour: 15, startMinute: 25, endHour: 16, endMinute: 15 }
+        ];
         const FIREBASE_DATA_PATH = 'attendance-app/main';
         const FIREBASE_SDK_VERSION = '10.13.2';
         const FIREBASE_COMPAT_SOURCES = [
@@ -1443,6 +1600,7 @@
         function createDefaultData() {
             return {
                 attendance: {},
+                periodAttendance: {},
                 excuses: [],
                 students: defaultRollNumbers.map(roll => ({
                     roll: roll,
@@ -1458,6 +1616,10 @@
         let reportMonth = new Date();
         let studentSelectedDate = new Date();
         let studentWeekDate = new Date();
+        let activeAttendanceMode = 'regular';
+        let activeMonthlyMode = 'regular';
+        let studentTodayMode = 'regular';
+        let studentWeeklyMode = 'regular';
         let database = null;
         let cloudRef = null;
         let authClient = null;
@@ -1465,12 +1627,16 @@
         let isApplyingRemoteUpdate = false;
         let pendingPush = false;
         let firebaseSdkPromise = null;
+        let regularSessionInterval = null;
+        let lastAutoSavedSessionDate = null;
+        let lastAutoSavedPeriodSessions = {};
 
         function normalizeData(raw = {}) {
             const base = createDefaultData();
             const merged = { ...base, ...raw };
 
             merged.attendance = merged.attendance && typeof merged.attendance === 'object' ? merged.attendance : {};
+            merged.periodAttendance = merged.periodAttendance && typeof merged.periodAttendance === 'object' ? merged.periodAttendance : {};
             merged.excuses = Array.isArray(merged.excuses) ? merged.excuses : [];
             merged.students = Array.isArray(merged.students)
                 ? merged.students.map(s => {
@@ -1500,6 +1666,411 @@
             }
 
             return merged;
+        }
+
+        function getRegularAttendanceForDate(dateKey) {
+            if (!data.attendance[dateKey] || typeof data.attendance[dateKey] !== 'object') {
+                data.attendance[dateKey] = {};
+            }
+
+            return data.attendance[dateKey];
+        }
+
+        function getPeriodAttendanceForDate(dateKey) {
+            if (!data.periodAttendance[dateKey] || typeof data.periodAttendance[dateKey] !== 'object') {
+                data.periodAttendance[dateKey] = {};
+            }
+
+            return data.periodAttendance[dateKey];
+        }
+
+        function parseDateKey(dateKey) {
+            const [year, month, day] = String(dateKey || '').split('-').map(Number);
+            return new Date(year, (month || 1) - 1, day || 1);
+        }
+
+        function isSaturday(date) {
+            return date instanceof Date && !Number.isNaN(date.getTime()) && date.getDay() === 6;
+        }
+
+        function isSportsPeriod(date, periodIndex) {
+            return isSaturday(date) && periodIndex >= 4;
+        }
+
+        function getAcademicPeriodCount(date) {
+            if (isSundayHoliday(date)) return 0;
+            return isSaturday(date) ? 4 : PERIOD_COUNT;
+        }
+
+        function getDefaultPeriodStatus(date, periodIndex) {
+            return isSportsPeriod(date, periodIndex) ? 'sports' : 'unmarked';
+        }
+
+        function normalizeStoredPeriodStatus(status, date, periodIndex) {
+            if (isSportsPeriod(date, periodIndex)) return 'sports';
+            if (status === 'present' || status === 'absent' || status === 'sports') return status;
+            return 'unmarked';
+        }
+
+        function getStudentPeriodRecord(dateKey, roll) {
+            const date = parseDateKey(dateKey);
+            const dayRecord = getPeriodAttendanceForDate(dateKey);
+            const existing = dayRecord[roll];
+
+            if (Array.isArray(existing)) {
+                return Array.from({ length: PERIOD_COUNT }, (_, index) =>
+                    normalizeStoredPeriodStatus(existing[index], date, index)
+                );
+            }
+
+            return Array.from({ length: PERIOD_COUNT }, (_, index) => getDefaultPeriodStatus(date, index));
+        }
+
+        function getPeriodPresentCount(periods = []) {
+            return periods.filter(status => status === 'present').length;
+        }
+
+        function getPeriodMarkedCount(periods = []) {
+            return periods.filter(status => status === 'present' || status === 'absent').length;
+        }
+
+        function getPeriodAbsentCount(periods = []) {
+            return periods.filter(status => status === 'absent').length;
+        }
+
+        function hasMeaningfulPeriodRecord(periods = []) {
+            return periods.some(status => status !== 'unmarked');
+        }
+
+        function hasMarkedAcademicPeriodRecord(periods = []) {
+            return periods.some(status => status === 'present' || status === 'absent');
+        }
+
+        function isSundayHoliday(date) {
+            return date instanceof Date && !Number.isNaN(date.getTime()) && date.getDay() === 0;
+        }
+
+        function isSundayHolidayDateKey(dateKey) {
+            return isSundayHoliday(parseDateKey(dateKey));
+        }
+
+        function formatTimeLabel(hour, minute) {
+            const suffix = hour >= 12 ? 'PM' : 'AM';
+            const normalizedHour = hour % 12 || 12;
+            return `${normalizedHour}:${String(minute).padStart(2, '0')} ${suffix}`;
+        }
+
+        function getPeriodSessionWindow(periodIndex, date = new Date()) {
+            const schedule = PERIOD_SESSION_SCHEDULE[periodIndex];
+            const start = new Date(date);
+            start.setHours(schedule.startHour, schedule.startMinute, 0, 0);
+
+            const end = new Date(date);
+            end.setHours(schedule.endHour, schedule.endMinute, 0, 0);
+
+            return { start, end, schedule };
+        }
+
+        function getPeriodSessionState(periodIndex, date = selectedDate) {
+            const now = new Date();
+            const { start, end, schedule } = getPeriodSessionWindow(periodIndex, date);
+            const isToday = isSameCalendarDate(date, now);
+
+            if (isSundayHoliday(date)) {
+                return { state: 'holiday', isEditable: false, isToday, start, end, schedule };
+            }
+
+            if (isSportsPeriod(date, periodIndex)) {
+                return { state: 'sports', isEditable: false, isToday, start, end, schedule };
+            }
+
+            if (!isToday) {
+                return {
+                    state: date < new Date(now.getFullYear(), now.getMonth(), now.getDate()) ? 'past' : 'future',
+                    isEditable: false,
+                    isToday: false,
+                    start,
+                    end,
+                    schedule
+                };
+            }
+
+            if (now < start) {
+                return { state: 'before', isEditable: false, isToday: true, start, end, schedule };
+            }
+
+            if (now >= start && now < end) {
+                return { state: 'active', isEditable: true, isToday: true, start, end, schedule };
+            }
+
+            return { state: 'ended', isEditable: false, isToday: true, start, end, schedule };
+        }
+
+        function renderPeriodStatusBadges(periods = []) {
+            return `
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;">
+                    ${periods.map((status, index) => `
+                        <span class="badge ${
+                            status === 'present' ? 'badge-present' :
+                            status === 'absent' ? 'badge-absent' :
+                            status === 'sports' ? '' : ''
+                        }" style="padding: 6px 10px; ${
+                            status === 'sports' || status === 'unmarked'
+                                ? 'color: var(--text-light); background: rgba(124, 168, 139, 0.1);'
+                                : ''
+                        }">
+                            P${index + 1}: ${
+                                status === 'present' ? 'Present' :
+                                status === 'absent' ? 'Absent' :
+                                status === 'sports' ? 'Sports' : 'Unmarked'
+                            }
+                        </span>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function isSameCalendarDate(a, b) {
+            return a.getFullYear() === b.getFullYear()
+                && a.getMonth() === b.getMonth()
+                && a.getDate() === b.getDate();
+        }
+
+        function getRegularSessionWindow(date = new Date()) {
+            const start = new Date(date);
+            start.setHours(REGULAR_SESSION_START_HOUR, REGULAR_SESSION_START_MINUTE, 0, 0);
+
+            const end = new Date(date);
+            end.setHours(REGULAR_SESSION_END_HOUR, REGULAR_SESSION_END_MINUTE, 0, 0);
+
+            return { start, end };
+        }
+
+        function getRegularSessionState(date = selectedDate) {
+            const now = new Date();
+            const { start, end } = getRegularSessionWindow(date);
+            const isToday = isSameCalendarDate(date, now);
+
+            if (isSundayHoliday(date)) {
+                return { state: 'holiday', isEditable: false, isToday, start, end };
+            }
+
+            if (!isToday) {
+                return {
+                    state: date < new Date(now.getFullYear(), now.getMonth(), now.getDate()) ? 'past' : 'future',
+                    isEditable: false,
+                    isToday: false,
+                    start,
+                    end
+                };
+            }
+
+            if (now < start) {
+                return { state: 'before', isEditable: false, isToday: true, start, end };
+            }
+
+            if (now >= start && now < end) {
+                return { state: 'active', isEditable: true, isToday: true, start, end };
+            }
+
+            return { state: 'ended', isEditable: false, isToday: true, start, end };
+        }
+
+        function isRegularAttendanceEditable() {
+            return getRegularSessionState(selectedDate).isEditable;
+        }
+
+        function getActiveEditablePeriodIndexes(date = selectedDate) {
+            return PERIOD_SESSION_SCHEDULE
+                .map((_, index) => index)
+                .filter(index => getPeriodSessionState(index, date).isEditable);
+        }
+
+        function finalizeRegularAttendance(dateKey) {
+            const date = parseDateKey(dateKey);
+            if (isSundayHoliday(date)) return false;
+
+            const dayAttendance = getRegularAttendanceForDate(dateKey);
+            let changed = false;
+
+            data.students.forEach(student => {
+                if (!dayAttendance[student.roll]) {
+                    dayAttendance[student.roll] = 'absent';
+                    changed = true;
+                }
+            });
+
+            return changed;
+        }
+
+        function finalizePeriodSession(dateKey, periodIndex) {
+            const date = parseDateKey(dateKey);
+            if (isSundayHoliday(date)) return false;
+
+            const dayAttendance = getPeriodAttendanceForDate(dateKey);
+            let changed = false;
+
+            data.students.forEach(student => {
+                const periods = getStudentPeriodRecord(dateKey, student.roll);
+                const targetStatus = isSportsPeriod(date, periodIndex)
+                    ? 'sports'
+                    : (periods[periodIndex] === 'unmarked' ? 'absent' : periods[periodIndex]);
+
+                if (periods[periodIndex] !== targetStatus) {
+                    periods[periodIndex] = targetStatus;
+                    changed = true;
+                }
+
+                if (!Array.isArray(dayAttendance[student.roll]) || dayAttendance[student.roll][periodIndex] !== targetStatus) {
+                    dayAttendance[student.roll] = periods;
+                    changed = true;
+                }
+            });
+
+            return changed;
+        }
+
+        function updateRegularSessionUI() {
+            const sessionCard = document.getElementById('regularSessionCard');
+            const sessionStatus = document.getElementById('regularSessionStatus');
+            const sessionNote = document.getElementById('regularSessionNote');
+            const sessionTitle = sessionCard.querySelector('h4');
+            const searchInput = document.getElementById('searchInput');
+            const attendanceDateInput = document.getElementById('attendanceDate');
+            const quickActionButtons = Array.from(document.querySelectorAll('#markTab .quick-actions button'));
+            const sessionWindow = `${String(REGULAR_SESSION_START_HOUR).padStart(2, '0')}:${String(REGULAR_SESSION_START_MINUTE).padStart(2, '0')} AM - ${String(REGULAR_SESSION_END_HOUR).padStart(2, '0')}:${String(REGULAR_SESSION_END_MINUTE).padStart(2, '0')} AM`;
+
+            sessionCard.style.display = 'block';
+            attendanceDateInput.disabled = false;
+
+            if (activeAttendanceMode === 'regular') {
+                const session = getRegularSessionState(selectedDate);
+                sessionTitle.textContent = 'Regular Attendance Session';
+
+                if (!canManageRegularAttendance()) {
+                    sessionStatus.textContent = 'REGULAR VIEW ONLY';
+                    sessionStatus.className = 'status-big no-record';
+                    sessionNote.textContent = 'Faculty can view regular attendance reports, but cannot mark or edit regular attendance.';
+                    searchInput.disabled = true;
+                    quickActionButtons.forEach(button => button.disabled = true);
+                    return;
+                }
+
+                if (session.state === 'active') {
+                    sessionStatus.textContent = 'SESSION ACTIVE';
+                    sessionStatus.className = 'status-big present';
+                    sessionNote.textContent = `Regular attendance can be marked only today during ${sessionWindow}. If the session ends, all unmarked students are marked absent, auto-saved, and editing is locked.`;
+                } else if (session.state === 'holiday') {
+                    sessionStatus.textContent = 'SUNDAY HOLIDAY';
+                    sessionStatus.className = 'status-big no-record';
+                    sessionNote.textContent = 'Attendance marking is disabled on Sundays because Sunday is a holiday.';
+                } else if (session.state === 'before') {
+                    sessionStatus.textContent = 'SESSION NOT STARTED';
+                    sessionStatus.className = 'status-big late';
+                    sessionNote.textContent = `Regular attendance session opens today at ${sessionWindow}. Marking is unavailable before the session starts.`;
+                } else if (session.state === 'ended') {
+                    sessionStatus.textContent = 'SESSION CLOSED';
+                    sessionStatus.className = 'status-big absent';
+                    sessionNote.textContent = `Today's regular attendance session ended at ${String(REGULAR_SESSION_END_HOUR).padStart(2, '0')}:${String(REGULAR_SESSION_END_MINUTE).padStart(2, '0')} AM. Unmarked students were finalized as absent and attendance is locked.`;
+                } else if (session.state === 'past') {
+                    sessionStatus.textContent = 'PAST DATE LOCKED';
+                    sessionStatus.className = 'status-big no-record';
+                    sessionNote.textContent = 'Regular attendance can only be marked on the same day during the active session window.';
+                } else {
+                    sessionStatus.textContent = 'FUTURE DATE LOCKED';
+                    sessionStatus.className = 'status-big no-record';
+                    sessionNote.textContent = 'Regular attendance cannot be marked for a future date. Use today during the active session window.';
+                }
+
+                const disabled = !session.isEditable;
+                searchInput.disabled = disabled;
+                quickActionButtons.forEach(button => button.disabled = disabled);
+            } else {
+                sessionTitle.textContent = 'Period-wise Attendance Session';
+                const sessionStates = PERIOD_SESSION_SCHEDULE.map((period, index) => ({ ...getPeriodSessionState(index, selectedDate), index, label: period.label }));
+                const activeSession = sessionStates.find(item => item.state === 'active');
+                const nextSession = sessionStates.find(item => item.state === 'before');
+                const endedSessions = sessionStates.filter(item => item.state === 'ended').length;
+                const sportsSessions = sessionStates.filter(item => item.state === 'sports').map(item => item.label);
+
+                if (isSundayHoliday(selectedDate)) {
+                    sessionStatus.textContent = 'SUNDAY HOLIDAY';
+                    sessionStatus.className = 'status-big no-record';
+                    sessionNote.textContent = 'Period-wise attendance is disabled on Sundays because Sunday is a holiday.';
+                } else if (activeSession) {
+                    sessionStatus.textContent = `${activeSession.label} ACTIVE`;
+                    sessionStatus.className = 'status-big present';
+                    sessionNote.textContent = `${activeSession.label} can be marked from ${formatTimeLabel(activeSession.schedule.startHour, activeSession.schedule.startMinute)} to ${formatTimeLabel(activeSession.schedule.endHour, activeSession.schedule.endMinute)}. When the session ends, unmarked students are finalized as absent and auto-saved.`;
+                } else if (nextSession && nextSession.isToday) {
+                    sessionStatus.textContent = 'NO ACTIVE PERIOD';
+                    sessionStatus.className = 'status-big late';
+                    sessionNote.textContent = `${nextSession.label} opens at ${formatTimeLabel(nextSession.schedule.startHour, nextSession.schedule.startMinute)}. Only the currently active period can be marked.`;
+                } else if (sessionStates.every(item => item.state === 'ended' || item.state === 'sports')) {
+                    sessionStatus.textContent = 'ALL PERIODS CLOSED';
+                    sessionStatus.className = 'status-big absent';
+                    sessionNote.textContent = `All period sessions for this date are closed. Unmarked students have been finalized as absent. ${sportsSessions.length ? `${sportsSessions.join(', ')} are sports periods.` : ''}`.trim();
+                } else if (sessionStates.every(item => item.state === 'past' || item.state === 'sports')) {
+                    sessionStatus.textContent = 'PAST DATE LOCKED';
+                    sessionStatus.className = 'status-big no-record';
+                    sessionNote.textContent = 'Period-wise attendance can only be marked on the same day during the active period window.';
+                } else {
+                    sessionStatus.textContent = 'FUTURE DATE LOCKED';
+                    sessionStatus.className = 'status-big no-record';
+                    sessionNote.textContent = 'Period-wise attendance cannot be marked for a future date.';
+                }
+
+                searchInput.disabled = false;
+                quickActionButtons.forEach(button => button.disabled = getActiveEditablePeriodIndexes(selectedDate).length === 0);
+            }
+        }
+
+        function handleRegularSessionTick() {
+            const today = new Date();
+            const todayKey = formatDateKey(today);
+            const regularSession = getRegularSessionState(today);
+            let hasAutoSaved = false;
+
+            if (regularSession.state === 'ended' && lastAutoSavedSessionDate !== todayKey) {
+                finalizeRegularAttendance(todayKey);
+                lastAutoSavedSessionDate = todayKey;
+                hasAutoSaved = true;
+                showToast('Regular attendance session ended. Unmarked students were finalized as absent and auto-saved.');
+            }
+
+            PERIOD_SESSION_SCHEDULE.forEach((period, index) => {
+                const session = getPeriodSessionState(index, today);
+                const sessionKey = `${todayKey}:${index}`;
+
+                if ((session.state === 'ended' || session.state === 'sports') && !lastAutoSavedPeriodSessions[sessionKey]) {
+                    finalizePeriodSession(todayKey, index);
+                    lastAutoSavedPeriodSessions[sessionKey] = true;
+                    hasAutoSaved = true;
+
+                    if (session.state === 'ended') {
+                        showToast(`${period.label} session ended. Unmarked students were finalized as absent and auto-saved.`);
+                    }
+                }
+            });
+
+            if (hasAutoSaved) {
+                saveToStorage();
+            }
+
+            if (currentUser && isStaffUser() && !document.getElementById('dashboard').classList.contains('hidden')) {
+                updateRegularSessionUI();
+                if (!document.getElementById('markTab').classList.contains('hidden')) {
+                    renderAttendanceView(document.getElementById('searchInput').value);
+                }
+            }
+        }
+
+        function startRegularSessionWatcher() {
+            if (regularSessionInterval) {
+                clearInterval(regularSessionInterval);
+            }
+
+            handleRegularSessionTick();
+            regularSessionInterval = setInterval(handleRegularSessionTick, 30000);
         }
 
         function updateSyncStatus(message, isError = false) {
@@ -1676,7 +2247,8 @@
             }
 
             if (!document.getElementById('markTab').classList.contains('hidden')) {
-                renderAttendanceList(document.getElementById('searchInput').value);
+                renderAttendanceView(document.getElementById('searchInput').value);
+                updateRegularSessionUI();
             }
 
             if (!document.getElementById('studentTodayTab').classList.contains('hidden')) {
@@ -1688,11 +2260,7 @@
             }
 
             if (!document.getElementById('monthlyTab').classList.contains('hidden')) {
-                if (currentUser.type === 'student') {
-                    renderStudentMonthlyView();
-                } else {
-                    renderMonthlyReport();
-                }
+                renderMonthlyView();
             }
 
             if (!document.getElementById('excusesTab').classList.contains('hidden')) {
@@ -1745,14 +2313,37 @@
             document.getElementById('studentDateSelector').value = today;
 
             await startRealtimeSync();
+            startRegularSessionWatcher();
         }
 
         function isAdminUser(user = currentUser) {
             return user?.type === 'cr' || user?.type === 'teacher';
         }
 
+        function isFacultyUser(user = currentUser) {
+            return user?.type === 'faculty';
+        }
+
+        function isStaffUser(user = currentUser) {
+            return isAdminUser(user) || isFacultyUser(user);
+        }
+
+        function canManageRegularAttendance(user = currentUser) {
+            return isAdminUser(user);
+        }
+
+        function canManagePeriodAttendance(user = currentUser) {
+            return user?.type === 'cr' || user?.type === 'faculty';
+        }
+
+        function canAccessExcuseAdmin(user = currentUser) {
+            return isAdminUser(user);
+        }
+
         function getAdminRoleLabel(loginType = currentUser?.type) {
-            return loginType === 'teacher' ? 'Class Teacher' : 'CR';
+            if (loginType === 'teacher') return 'Class Teacher';
+            if (loginType === 'faculty') return 'Faculty';
+            return 'CR';
         }
 
         // Populate roll numbers dropdown
@@ -1789,7 +2380,7 @@
             const emailInput = document.getElementById('crEmail');
             const passwordInput = document.getElementById('crPassword');
 
-            if (loginType === 'cr' || loginType === 'teacher') {
+            if (loginType === 'cr' || loginType === 'teacher' || loginType === 'faculty') {
                 const roleLabel = getAdminRoleLabel(loginType);
                 rollGroup.classList.add('hidden');
                 emailGroup.classList.remove('hidden');
@@ -1811,7 +2402,7 @@
         async function handleLogin() {
             const loginType = document.getElementById('loginType').value;
 
-            if (loginType === 'cr' || loginType === 'teacher') {
+            if (loginType === 'cr' || loginType === 'teacher' || loginType === 'faculty') {
                 const email = document.getElementById('crEmail').value.trim();
                 const password = document.getElementById('crPassword').value;
                 const roleLabel = getAdminRoleLabel(loginType);
@@ -1830,7 +2421,11 @@
                     await authClient.signInWithEmailAndPassword(email, password);
                     currentUser = {
                         type: loginType,
-                        roll: loginType === 'teacher' ? 'CLASS TEACHER' : 'CR'
+                        roll: loginType === 'teacher'
+                            ? 'CLASS TEACHER'
+                            : loginType === 'faculty'
+                                ? 'FACULTY'
+                                : 'CR'
                     };
                     showDashboard();
                 } catch (error) {
@@ -1869,16 +2464,26 @@
         function showDashboard() {
             document.getElementById('loginPage').classList.add('hidden');
             document.getElementById('dashboard').classList.remove('hidden');
+            activeAttendanceMode = 'regular';
+            activeMonthlyMode = 'regular';
+            studentTodayMode = 'regular';
+            studentWeeklyMode = 'regular';
 
-            if (isAdminUser()) {
+            if (isStaffUser()) {
                 document.getElementById('dashboardTitle').textContent = `${getAdminRoleLabel()} Dashboard - Attendance Management`;
                 document.getElementById('crControls').classList.remove('hidden');
                 document.getElementById('studentControls').classList.add('hidden');
-                document.getElementById('manageStudentsBtn').classList.remove('hidden');
+                document.getElementById('manageStudentsBtn').classList.toggle('hidden', !isAdminUser());
                 document.getElementById('excuseBtn').classList.add('hidden');
                 document.getElementById('calendarBtn').classList.remove('hidden');
-                document.getElementById('downloadOptions').classList.remove('hidden');
+                document.getElementById('downloadOptions').classList.toggle('hidden', !isStaffUser());
+                document.getElementById('excusesTabBtn').classList.toggle('hidden', !canAccessExcuseAdmin());
+                document.getElementById('markRegularTabBtn').disabled = !canManageRegularAttendance();
+                document.getElementById('markRegularTabBtn').style.opacity = canManageRegularAttendance() ? '1' : '0.5';
+                document.getElementById('markPeriodTabBtn').disabled = !canManagePeriodAttendance();
+                document.getElementById('markPeriodTabBtn').style.opacity = canManagePeriodAttendance() ? '1' : '0.5';
                 switchTab('mark');
+                updateRegularSessionUI();
                 updateExcuseBadge();
             } else {
                 document.getElementById('dashboardTitle').textContent = `Student Dashboard - ${currentUser.roll}`;
@@ -1888,9 +2493,18 @@
                 document.getElementById('excuseBtn').classList.remove('hidden');
                 document.getElementById('calendarBtn').classList.remove('hidden');
                 document.getElementById('downloadOptions').classList.add('hidden');
+                document.getElementById('excusesTabBtn').classList.add('hidden');
+                document.getElementById('markRegularTabBtn').disabled = false;
+                document.getElementById('markRegularTabBtn').style.opacity = '1';
+                document.getElementById('markPeriodTabBtn').disabled = false;
+                document.getElementById('markPeriodTabBtn').style.opacity = '1';
                 switchTab('studentToday');
             }
             populateRollNumbers();
+            setAttendanceMode(canManageRegularAttendance() ? 'regular' : 'period');
+            setMonthlyMode('regular');
+            setStudentTodayMode('regular');
+            setStudentWeeklyMode('regular');
         }
 
         // Switch tabs
@@ -1904,7 +2518,7 @@
 
             if (tab === 'mark') {
                 document.getElementById('markTab').classList.remove('hidden');
-                renderAttendanceList();
+                renderAttendanceView();
             } else if (tab === 'studentToday') {
                 document.getElementById('studentTodayTab').classList.remove('hidden');
                 updateStudentTodayView();
@@ -1917,12 +2531,12 @@
                     document.getElementById('monthlyStatsGrid').classList.add('hidden');
                     document.getElementById('crMonthlyTable').classList.add('hidden');
                     document.getElementById('studentMonthlyView').classList.remove('hidden');
-                    renderStudentMonthlyView();
+                    renderMonthlyView();
                 } else {
                     document.getElementById('monthlyStatsGrid').classList.remove('hidden');
                     document.getElementById('crMonthlyTable').classList.remove('hidden');
                     document.getElementById('studentMonthlyView').classList.add('hidden');
-                    renderMonthlyReport();
+                    renderMonthlyView();
                 }
             } else if (tab === 'excuses') {
                 document.getElementById('excusesTab').classList.remove('hidden');
@@ -1935,6 +2549,7 @@
             const dateInput = document.getElementById('studentDateSelector').value;
             studentSelectedDate = new Date(dateInput);
             const dateKey = formatDateKey(studentSelectedDate);
+            const isSunday = isSundayHoliday(studentSelectedDate);
             
             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
             document.getElementById('studentDateTitle').textContent = 
@@ -1942,26 +2557,72 @@
 
             const att = data.attendance[dateKey] || {};
             const status = att[currentUser.roll];
-            
             const statusEl = document.getElementById('studentTodayStatus');
             const noteEl = document.getElementById('studentTodayNote');
+            const periodDetailsEl = document.getElementById('studentTodayPeriodDetails');
 
-            if (status === 'present') {
+            if (isSunday) {
+                statusEl.textContent = 'SUNDAY HOLIDAY';
+                statusEl.className = 'status-big no-record';
+                noteEl.textContent = 'Attendance is not marked on Sundays because Sunday is a holiday.';
+                periodDetailsEl.innerHTML = '';
+                periodDetailsEl.classList.add('hidden');
+                return;
+            }
+
+            if (studentTodayMode === 'period') {
+                const periods = getStudentPeriodRecord(dateKey, currentUser.roll);
+                if (hasMeaningfulPeriodRecord(periods)) {
+                    const presentCount = getPeriodPresentCount(periods);
+                    const academicCount = getAcademicPeriodCount(studentSelectedDate);
+                    statusEl.textContent = `${presentCount}/${academicCount} PRESENT`;
+                    statusEl.className = `status-big ${presentCount > 0 ? 'present' : 'absent'}`;
+                    noteEl.textContent = `Period-wise attendance for this date. Present in ${presentCount} of ${academicCount} academic periods.`;
+                    periodDetailsEl.innerHTML = periods.map((item, index) => `
+                        <div class="period-detail-card">
+                            <h4>${PERIOD_SESSION_SCHEDULE[index].label}</h4>
+                            <span class="badge ${
+                                item === 'present' ? 'badge-present' :
+                                item === 'absent' ? 'badge-absent' : ''
+                            }" style="${
+                                item === 'sports' || item === 'unmarked'
+                                    ? 'color: var(--text-light); background: rgba(124, 168, 139, 0.1);'
+                                    : ''
+                            }">${item.toUpperCase()}</span>
+                        </div>
+                    `).join('');
+                    periodDetailsEl.classList.remove('hidden');
+                } else {
+                    statusEl.textContent = 'NO RECORD';
+                    statusEl.className = 'status-big no-record';
+                    noteEl.textContent = 'Period-wise attendance not marked for this date.';
+                    periodDetailsEl.innerHTML = '';
+                    periodDetailsEl.classList.add('hidden');
+                }
+            } else if (status === 'present') {
                 statusEl.textContent = 'PRESENT';
                 statusEl.className = 'status-big present';
                 noteEl.textContent = 'Great! You were present on this day.';
+                periodDetailsEl.innerHTML = '';
+                periodDetailsEl.classList.add('hidden');
             } else if (status === 'absent') {
                 statusEl.textContent = 'ABSENT';
                 statusEl.className = 'status-big absent';
                 noteEl.textContent = 'You were marked absent on this day.';
+                periodDetailsEl.innerHTML = '';
+                periodDetailsEl.classList.add('hidden');
             } else if (status === 'late') {
                 statusEl.textContent = 'LATE';
                 statusEl.className = 'status-big late';
                 noteEl.textContent = 'You arrived late on this day.';
+                periodDetailsEl.innerHTML = '';
+                periodDetailsEl.classList.add('hidden');
             } else {
                 statusEl.textContent = 'NO RECORD';
                 statusEl.className = 'status-big no-record';
                 noteEl.textContent = 'Attendance not marked for this date.';
+                periodDetailsEl.innerHTML = '';
+                periodDetailsEl.classList.add('hidden');
             }
         }
 
@@ -1985,19 +2646,37 @@
             today.setHours(0, 0, 0, 0);
 
             let p = 0, a = 0, l = 0, nr = 0;
+            let presentPeriods = 0, absentPeriods = 0, recordedPeriodDays = 0;
             let gridHtml = '';
 
             for (let i = 0; i < 7; i++) {
                 const d = new Date(startOfWeek);
                 d.setDate(startOfWeek.getDate() + i);
                 const dateKey = formatDateKey(d);
+                const isSunday = isSundayHoliday(d);
                 const att = data.attendance[dateKey] || {};
                 const status = att[currentUser.roll];
+                const periods = getStudentPeriodRecord(dateKey, currentUser.roll);
 
                 let statusClass = 'no-record';
                 let statusText = '-';
                 
-                if (status === 'present') {
+                if (isSunday) {
+                    statusText = 'HOL';
+                } else if (studentWeeklyMode === 'period') {
+                    if (hasMeaningfulPeriodRecord(periods)) {
+                        const dayPresent = getPeriodPresentCount(periods);
+                        const dayAbsent = getPeriodAbsentCount(periods);
+                        const academicCount = getAcademicPeriodCount(d);
+                        presentPeriods += dayPresent;
+                        absentPeriods += dayAbsent;
+                        if (hasMarkedAcademicPeriodRecord(periods)) recordedPeriodDays++;
+                        statusClass = dayPresent > 0 ? 'present' : (dayAbsent > 0 ? 'absent' : 'no-record');
+                        statusText = `${dayPresent}/${academicCount}`;
+                    } else {
+                        nr++;
+                    }
+                } else if (status === 'present') {
                     statusClass = 'present';
                     statusText = 'P';
                     p++;
@@ -2015,38 +2694,73 @@
 
                 const isToday = d.getTime() === today.getTime();
 
-                gridHtml += `
-                    <div class="weekly-day ${isToday ? 'today' : ''}">
-                        <div class="day-name">${days[i]}</div>
-                        <div class="day-date">${d.getDate()}</div>
-                        <div class="day-status ${statusClass}">${statusText}</div>
-                    </div>
-                `;
+                if (studentWeeklyMode === 'period' && hasMeaningfulPeriodRecord(periods)) {
+                    gridHtml += `
+                        <div class="weekly-day ${isToday ? 'today' : ''}" style="text-align: left; padding: 14px;">
+                            <div class="day-name">${days[i]}</div>
+                            <div class="day-date">${d.getDate()}</div>
+                            <div class="day-status ${statusClass}" style="margin-bottom: 10px;">${statusText}</div>
+                            ${renderPeriodStatusBadges(periods)}
+                        </div>
+                    `;
+                } else {
+                    gridHtml += `
+                        <div class="weekly-day ${isToday ? 'today' : ''}">
+                            <div class="day-name">${days[i]}</div>
+                            <div class="day-date">${d.getDate()}</div>
+                            <div class="day-status ${statusClass}">${statusText}</div>
+                        </div>
+                    `;
+                }
             }
 
             document.getElementById('weeklyGrid').innerHTML = gridHtml;
 
-            const total = p + a + l;
-            const pct = total > 0 ? Math.round((p + l) / total * 100) : 0;
+            if (studentWeeklyMode === 'period') {
+                const totalPeriods = presentPeriods + absentPeriods;
+                const pct = totalPeriods > 0 ? Math.round((presentPeriods / totalPeriods) * 100) : 0;
 
-            document.getElementById('weeklySummary').innerHTML = `
-                <div class="weekly-summary-item">
-                    <h5>Present</h5>
-                    <div class="value" style="color: var(--accent);">${p}</div>
-                </div>
-                <div class="weekly-summary-item">
-                    <h5>Absent</h5>
-                    <div class="value" style="color: #ff9aad;">${a}</div>
-                </div>
-                <div class="weekly-summary-item">
-                    <h5>Late</h5>
-                    <div class="value" style="color: #ffd28a;">${l}</div>
-                </div>
-                <div class="weekly-summary-item">
-                    <h5>Attendance</h5>
-                    <div class="value">${pct}%</div>
-                </div>
-            `;
+                document.getElementById('weeklySummary').innerHTML = `
+                    <div class="weekly-summary-item">
+                        <h5>Present Periods</h5>
+                        <div class="value" style="color: var(--accent);">${presentPeriods}</div>
+                    </div>
+                    <div class="weekly-summary-item">
+                        <h5>Absent Periods</h5>
+                        <div class="value" style="color: #ff9aad;">${absentPeriods}</div>
+                    </div>
+                    <div class="weekly-summary-item">
+                        <h5>Days Recorded</h5>
+                        <div class="value" style="color: var(--info);">${recordedPeriodDays}</div>
+                    </div>
+                    <div class="weekly-summary-item">
+                        <h5>Attendance</h5>
+                        <div class="value">${pct}%</div>
+                    </div>
+                `;
+            } else {
+                const total = p + a + l;
+                const pct = total > 0 ? Math.round((p + l) / total * 100) : 0;
+
+                document.getElementById('weeklySummary').innerHTML = `
+                    <div class="weekly-summary-item">
+                        <h5>Present</h5>
+                        <div class="value" style="color: var(--accent);">${p}</div>
+                    </div>
+                    <div class="weekly-summary-item">
+                        <h5>Absent</h5>
+                        <div class="value" style="color: #ff9aad;">${a}</div>
+                    </div>
+                    <div class="weekly-summary-item">
+                        <h5>Late</h5>
+                        <div class="value" style="color: #ffd28a;">${l}</div>
+                    </div>
+                    <div class="weekly-summary-item">
+                        <h5>Attendance</h5>
+                        <div class="value">${pct}%</div>
+                    </div>
+                `;
+            }
         }
 
         function changeWeek(delta) {
@@ -2054,23 +2768,85 @@
             renderStudentWeeklyView();
         }
 
+        function setStudentTodayMode(mode) {
+            studentTodayMode = mode;
+            document.getElementById('studentTodayRegularTabBtn').classList.toggle('active', mode === 'regular');
+            document.getElementById('studentTodayPeriodTabBtn').classList.toggle('active', mode === 'period');
+            updateStudentTodayView();
+        }
+
+        function setStudentWeeklyMode(mode) {
+            studentWeeklyMode = mode;
+            document.getElementById('studentWeeklyRegularTabBtn').classList.toggle('active', mode === 'regular');
+            document.getElementById('studentWeeklyPeriodTabBtn').classList.toggle('active', mode === 'period');
+            renderStudentWeeklyView();
+        }
+
+        function setAttendanceMode(mode) {
+            if (mode === 'regular' && !canManageRegularAttendance()) {
+                activeAttendanceMode = 'period';
+                showToast('Faculty can mark only period-wise attendance.');
+                document.getElementById('markRegularTabBtn').classList.remove('active');
+                document.getElementById('markPeriodTabBtn').classList.add('active');
+                document.getElementById('regularAttendanceSection').classList.add('hidden');
+                document.getElementById('periodAttendanceSection').classList.remove('hidden');
+                document.getElementById('attendanceModeNote').textContent = `Select date to mark period-wise attendance for ${PERIOD_COUNT} periods`;
+                document.getElementById('totalCountLabel').textContent = 'Total Students';
+                document.getElementById('presentCountLabel').textContent = 'Present Periods';
+                document.getElementById('absentCountLabel').textContent = 'Absent Periods';
+                document.getElementById('lateCountLabel').textContent = 'Full Present Days';
+                updateRegularSessionUI();
+                renderAttendanceView(document.getElementById('searchInput').value);
+                return;
+            }
+
+            activeAttendanceMode = mode;
+            document.getElementById('markRegularTabBtn').classList.toggle('active', mode === 'regular');
+            document.getElementById('markPeriodTabBtn').classList.toggle('active', mode === 'period');
+            document.getElementById('regularAttendanceSection').classList.toggle('hidden', mode !== 'regular');
+            document.getElementById('periodAttendanceSection').classList.toggle('hidden', mode !== 'period');
+            document.getElementById('attendanceModeNote').textContent = mode === 'regular'
+                ? 'Select date to mark regular attendance'
+                : `Select date to mark period-wise attendance for ${PERIOD_COUNT} periods`;
+
+            if (mode === 'regular') {
+                document.getElementById('totalCountLabel').textContent = 'Total Students';
+                document.getElementById('presentCountLabel').textContent = 'Present';
+                document.getElementById('absentCountLabel').textContent = 'Absent';
+                document.getElementById('lateCountLabel').textContent = 'Late';
+            } else {
+                document.getElementById('totalCountLabel').textContent = 'Total Students';
+                document.getElementById('presentCountLabel').textContent = 'Present Periods';
+                document.getElementById('absentCountLabel').textContent = 'Absent Periods';
+                document.getElementById('lateCountLabel').textContent = 'Full Present Days';
+            }
+
+            updateRegularSessionUI();
+            renderAttendanceView(document.getElementById('searchInput').value);
+        }
+
+        function renderAttendanceView(filter = '') {
+            if (activeAttendanceMode === 'period') {
+                renderPeriodAttendanceList(filter);
+            } else {
+                renderAttendanceList(filter);
+            }
+        }
+
         // CR Attendance Marking
         function changeAttendanceDate() {
             const dateInput = document.getElementById('attendanceDate').value;
-            selectedDate = new Date(dateInput + 'T00:00:00');
-            if (selectedDate.getDay() === 0) {
-                showToast('⚠️ Sunday is a holiday — attendance cannot be marked!');
-            }
-            renderAttendanceList();
+            selectedDate = new Date(dateInput);
+            updateRegularSessionUI();
+            renderAttendanceView(document.getElementById('searchInput').value);
         }
 
         function renderAttendanceList(filter = '') {
             const list = document.getElementById('attendanceList');
             const dateKey = formatDateKey(selectedDate);
-            
-            if (!data.attendance[dateKey]) {
-                data.attendance[dateKey] = {};
-            }
+            const dayAttendance = getRegularAttendanceForDate(dateKey);
+            const isSunday = isSundayHoliday(selectedDate);
+            const isEditable = !isSunday && isRegularAttendanceEditable();
 
             let presentCount = 0;
             let absentCount = 0;
@@ -2084,7 +2860,7 @@
             list.innerHTML = filteredStudents.map(student => {
                 const roll = student.roll;
                 const name = student.name;
-                const status = data.attendance[dateKey][roll] || 'absent';
+                const status = isSunday ? null : (dayAttendance[roll] || 'absent');
                 if (status === 'present') presentCount++;
                 else if (status === 'absent') absentCount++;
                 else if (status === 'late') lateCount++;
@@ -2101,9 +2877,13 @@
                             </div>
                         </div>
                         <div class="status-toggle">
-                            <button class="status-btn present ${status === 'present' ? 'active' : ''}" onclick="setStatus('${roll}', 'present')">P</button>
-                            <button class="status-btn absent ${status === 'absent' ? 'active' : ''}" onclick="setStatus('${roll}', 'absent')">A</button>
-                            <button class="status-btn late ${status === 'late' ? 'active' : ''}" onclick="setStatus('${roll}', 'late')">L</button>
+                            ${isSunday
+                                ? '<span class="badge" style="color: var(--text-light); background: rgba(124, 168, 139, 0.1);">SUNDAY HOLIDAY</span>'
+                                : `
+                                    <button class="status-btn present ${status === 'present' ? 'active' : ''}" onclick="setStatus('${roll}', 'present')" ${isEditable ? '' : 'disabled'}>P</button>
+                                    <button class="status-btn absent ${status === 'absent' ? 'active' : ''}" onclick="setStatus('${roll}', 'absent')" ${isEditable ? '' : 'disabled'}>A</button>
+                                    <button class="status-btn late ${status === 'late' ? 'active' : ''}" onclick="setStatus('${roll}', 'late')" ${isEditable ? '' : 'disabled'}>L</button>
+                                `}
                         </div>
                     </div>
                 `;
@@ -2115,60 +2895,272 @@
             document.getElementById('lateCount').textContent = lateCount;
         }
 
-        function setStatus(roll, status) {
-            if (selectedDate.getDay() === 0) { showToast('❌ Cannot mark attendance on Sundays!'); return; }
+        function renderPeriodAttendanceList(filter = '') {
+            const list = document.getElementById('periodAttendanceList');
             const dateKey = formatDateKey(selectedDate);
-            if (!data.attendance[dateKey]) {
-                data.attendance[dateKey] = {};
+
+            let totalPresentPeriods = 0;
+            let totalAbsentPeriods = 0;
+            let fullPresentDays = 0;
+
+            const filteredStudents = data.students.filter(student =>
+                student.roll.toLowerCase().includes(filter.toLowerCase()) ||
+                student.name.toLowerCase().includes(filter.toLowerCase())
+            );
+
+            list.innerHTML = filteredStudents.map(student => {
+                const roll = student.roll;
+                const periods = getStudentPeriodRecord(dateKey, roll);
+                const presentCount = getPeriodPresentCount(periods);
+                const absentCount = getPeriodAbsentCount(periods);
+                const academicCount = getAcademicPeriodCount(selectedDate);
+                totalPresentPeriods += presentCount;
+                totalAbsentPeriods += absentCount;
+                if (academicCount > 0 && presentCount === academicCount) fullPresentDays++;
+
+                return `
+                    <div class="attendance-item period-row">
+                        <div class="student-info">
+                            <div class="student-avatar">${roll.slice(-3)}</div>
+                            <div>
+                                <div style="font-weight: 600;">${roll}</div>
+                                <div style="font-size: 0.85rem; color: var(--text-light);">${student.name}</div>
+                                <div class="period-summary">${isSundayHoliday(selectedDate) ? 'Sunday holiday' : `${presentCount}/${academicCount} academic periods present`}</div>
+                            </div>
+                        </div>
+                        <div class="period-wise-controls">
+                            ${isSundayHoliday(selectedDate)
+                                ? '<span class="badge" style="color: var(--text-light); background: rgba(124, 168, 139, 0.1);">SUNDAY HOLIDAY</span>'
+                                : periods.map((status, index) => {
+                                    const session = getPeriodSessionState(index, selectedDate);
+                                    const disabled = session.state !== 'active' || status === 'sports';
+                                    const label = PERIOD_SESSION_SCHEDULE[index].label;
+                                    const timeLabel = `${formatTimeLabel(session.schedule.startHour, session.schedule.startMinute)} - ${formatTimeLabel(session.schedule.endHour, session.schedule.endMinute)}`;
+                                    return `
+                                    <div class="period-card">
+                                        <div class="period-card-title">${label}</div>
+                                        <div style="font-size: 0.72rem; color: var(--text-light); margin-bottom: 8px;">${timeLabel}</div>
+                                        <div class="status-toggle">
+                                            ${status === 'sports'
+                                                ? '<span class="badge" style="color: var(--text-light); background: rgba(124, 168, 139, 0.1);">SPORTS</span>'
+                                                : `
+                                                    <button class="status-btn present ${status === 'present' ? 'active' : ''}" onclick="setPeriodStatus('${roll}', ${index}, 'present')" ${disabled ? 'disabled' : ''}>P</button>
+                                                    <button class="status-btn absent ${status === 'absent' ? 'active' : ''}" onclick="setPeriodStatus('${roll}', ${index}, 'absent')" ${disabled ? 'disabled' : ''}>A</button>
+                                                `}
+                                        </div>
+                                        <div style="font-size: 0.72rem; color: var(--text-light); margin-top: 8px;">${
+                                            session.state === 'active' ? 'Active now' :
+                                            session.state === 'before' ? 'Not started' :
+                                            session.state === 'ended' ? 'Closed' :
+                                            session.state === 'sports' ? 'Sports period' :
+                                            session.state === 'holiday' ? 'Holiday' :
+                                            session.state === 'past' ? 'Locked' : 'Locked'
+                                        }</div>
+                                    </div>
+                                `; }).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('totalCount').textContent = filteredStudents.length;
+            document.getElementById('presentCount').textContent = totalPresentPeriods;
+            document.getElementById('absentCount').textContent = totalAbsentPeriods;
+            document.getElementById('lateCount').textContent = fullPresentDays;
+        }
+
+        function setStatus(roll, status) {
+            if (!canManageRegularAttendance()) {
+                showToast('Faculty cannot edit regular attendance.');
+                return;
             }
-            data.attendance[dateKey][roll] = status;
+
+            if (isSundayHoliday(selectedDate)) {
+                showToast('Attendance cannot be marked on Sundays.');
+                return;
+            }
+
+            if (!isRegularAttendanceEditable()) {
+                showToast('Regular attendance session is closed. Editing is not allowed.');
+                updateRegularSessionUI();
+                return;
+            }
+
+            const dateKey = formatDateKey(selectedDate);
+            getRegularAttendanceForDate(dateKey)[roll] = status;
             saveToStorage();
             renderAttendanceList(document.getElementById('searchInput').value);
+        }
+
+        function setPeriodStatus(roll, periodIndex, status) {
+            if (!canManagePeriodAttendance()) {
+                showToast('You do not have permission to edit period-wise attendance.');
+                return;
+            }
+
+            if (isSundayHoliday(selectedDate)) {
+                showToast('Attendance cannot be marked on Sundays.');
+                return;
+            }
+
+            const session = getPeriodSessionState(periodIndex, selectedDate);
+            if (!session.isEditable) {
+                showToast(`${PERIOD_SESSION_SCHEDULE[periodIndex].label} is not editable right now.`);
+                updateRegularSessionUI();
+                return;
+            }
+
+            const dateKey = formatDateKey(selectedDate);
+            const dayAttendance = getPeriodAttendanceForDate(dateKey);
+            const periods = getStudentPeriodRecord(dateKey, roll);
+            periods[periodIndex] = status;
+            dayAttendance[roll] = periods;
+            saveToStorage();
+            renderPeriodAttendanceList(document.getElementById('searchInput').value);
         }
 
         function markAllPresent() {
-            if (selectedDate.getDay() === 0) { showToast('❌ Cannot mark attendance on Sundays!'); return; }
             const dateKey = formatDateKey(selectedDate);
-            if (!data.attendance[dateKey]) data.attendance[dateKey] = {};
-            data.students.forEach(student => data.attendance[dateKey][student.roll] = 'present');
+            if (isSundayHoliday(selectedDate)) {
+                showToast('Attendance cannot be marked on Sundays.');
+                return;
+            }
+            if (activeAttendanceMode === 'period') {
+                if (!canManagePeriodAttendance()) {
+                    showToast('You do not have permission to edit period-wise attendance.');
+                    return;
+                }
+                const editablePeriodIndexes = getActiveEditablePeriodIndexes(selectedDate);
+                if (editablePeriodIndexes.length === 0) {
+                    showToast('No active period session is available for marking.');
+                    updateRegularSessionUI();
+                    return;
+                }
+                const dayAttendance = getPeriodAttendanceForDate(dateKey);
+                data.students.forEach(student => {
+                    const periods = getStudentPeriodRecord(dateKey, student.roll);
+                    editablePeriodIndexes.forEach(periodIndex => {
+                        periods[periodIndex] = 'present';
+                    });
+                    dayAttendance[student.roll] = periods;
+                });
+            } else {
+                if (!canManageRegularAttendance()) {
+                    showToast('Faculty cannot edit regular attendance.');
+                    return;
+                }
+                if (!isRegularAttendanceEditable()) {
+                    showToast('Regular attendance session is closed. Editing is not allowed.');
+                    updateRegularSessionUI();
+                    return;
+                }
+                const dayAttendance = getRegularAttendanceForDate(dateKey);
+                data.students.forEach(student => dayAttendance[student.roll] = 'present');
+            }
             saveToStorage();
-            renderAttendanceList();
-            showToast('All students marked present!');
+            renderAttendanceView();
+            showToast(activeAttendanceMode === 'period' ? 'All students marked present for the active period!' : 'All students marked present!');
         }
 
         function markAllAbsent() {
-            if (selectedDate.getDay() === 0) { showToast('❌ Cannot mark attendance on Sundays!'); return; }
             const dateKey = formatDateKey(selectedDate);
-            if (!data.attendance[dateKey]) data.attendance[dateKey] = {};
-            data.students.forEach(student => data.attendance[dateKey][student.roll] = 'absent');
+            if (isSundayHoliday(selectedDate)) {
+                showToast('Attendance cannot be marked on Sundays.');
+                return;
+            }
+            if (activeAttendanceMode === 'period') {
+                if (!canManagePeriodAttendance()) {
+                    showToast('You do not have permission to edit period-wise attendance.');
+                    return;
+                }
+                const editablePeriodIndexes = getActiveEditablePeriodIndexes(selectedDate);
+                if (editablePeriodIndexes.length === 0) {
+                    showToast('No active period session is available for marking.');
+                    updateRegularSessionUI();
+                    return;
+                }
+                const dayAttendance = getPeriodAttendanceForDate(dateKey);
+                data.students.forEach(student => {
+                    const periods = getStudentPeriodRecord(dateKey, student.roll);
+                    editablePeriodIndexes.forEach(periodIndex => {
+                        periods[periodIndex] = 'absent';
+                    });
+                    dayAttendance[student.roll] = periods;
+                });
+            } else {
+                if (!canManageRegularAttendance()) {
+                    showToast('Faculty cannot edit regular attendance.');
+                    return;
+                }
+                if (!isRegularAttendanceEditable()) {
+                    showToast('Regular attendance session is closed. Editing is not allowed.');
+                    updateRegularSessionUI();
+                    return;
+                }
+                const dayAttendance = getRegularAttendanceForDate(dateKey);
+                data.students.forEach(student => dayAttendance[student.roll] = 'absent');
+            }
             saveToStorage();
-            renderAttendanceList();
-            showToast('All students marked absent!');
+            renderAttendanceView();
+            showToast(activeAttendanceMode === 'period' ? 'All students marked absent for the active period!' : 'All students marked absent!');
         }
 
         function filterStudents() {
-            renderAttendanceList(document.getElementById('searchInput').value);
-        }
-      
-        function saveAttendance() {
-            const dateKey = formatDateKey(selectedDate);
-            const selectedDay = selectedDate.getDay(); // 0 = Sunday
-            if (selectedDay === 0) {
-                showToast('❌ Attendance cannot be marked on Sundays!');
-                return;
-            }
-            if (!data.attendance[dateKey] || Object.keys(data.attendance[dateKey]).length === 0) {
-                showToast('No attendance changes to save!');
-                return;
-            }
-            saveToStorage();
-            showToast('✅ Attendance saved successfully!');
-            renderMonthlyReport && renderMonthlyReport();
+            renderAttendanceView(document.getElementById('searchInput').value);
         }
 
-        // Monthly Report
-        function changeReportMonth(delta) {
-            reportMonth.setMonth(reportMonth.getMonth() + delta);
+        function saveAttendance() {
+            if (isSundayHoliday(selectedDate)) {
+                showToast('Attendance cannot be marked on Sundays.');
+                return;
+            }
+
+            if (activeAttendanceMode === 'regular' && !canManageRegularAttendance()) {
+                showToast('Faculty cannot edit regular attendance.');
+                return;
+            }
+
+            if (activeAttendanceMode === 'period' && !canManagePeriodAttendance()) {
+                showToast('You do not have permission to edit period-wise attendance.');
+                return;
+            }
+
+            if (activeAttendanceMode === 'regular' && !isRegularAttendanceEditable()) {
+                showToast('Regular attendance session is closed. Editing is not allowed.');
+                updateRegularSessionUI();
+                return;
+            }
+
+            saveToStorage();
+            showToast(activeAttendanceMode === 'period' ? 'Attendance saved for period-wise mode!' : 'Attendance saved successfully!');
+        }
+
+        // Format date key
+        function formatDateKey(date) {
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        }
+
+        function setMonthlyMode(mode) {
+            activeMonthlyMode = mode;
+            document.getElementById('monthlyRegularTabBtn').classList.toggle('active', mode === 'regular');
+            document.getElementById('monthlyPeriodTabBtn').classList.toggle('active', mode === 'period');
+
+            if (mode === 'regular') {
+                document.getElementById('monthlyTotalDaysLabel').textContent = 'Days Recorded';
+                document.getElementById('monthlyTotalPresentLabel').textContent = 'Total Present';
+                document.getElementById('monthlyTotalAbsentLabel').textContent = 'Total Absent';
+                document.getElementById('monthlyAvgAttendanceLabel').textContent = 'Avg Attendance';
+            } else {
+                document.getElementById('monthlyTotalDaysLabel').textContent = 'Days Recorded';
+                document.getElementById('monthlyTotalPresentLabel').textContent = 'Present Periods';
+                document.getElementById('monthlyTotalAbsentLabel').textContent = 'Absent Periods';
+                document.getElementById('monthlyAvgAttendanceLabel').textContent = 'Period Percentage';
+            }
+
+            renderMonthlyView();
+        }
+
+        function renderMonthlyView() {
             if (currentUser.type === 'student') {
                 renderStudentMonthlyView();
             } else {
@@ -2176,7 +3168,18 @@
             }
         }
 
+        // Monthly Report
+        function changeReportMonth(delta) {
+            reportMonth.setMonth(reportMonth.getMonth() + delta);
+            renderMonthlyView();
+        }
+
         function renderMonthlyReport() {
+            if (activeMonthlyMode === 'period') {
+                renderPeriodMonthlyReport();
+                return;
+            }
+
             const year = reportMonth.getFullYear();
             const month = reportMonth.getMonth();
             
@@ -2193,11 +3196,7 @@
             }
 
             let headerHtml = '<tr><th>Roll Number</th><th>Name</th>';
-            days.forEach(d => {
-                const dow = new Date(year, month, d.day).getDay();
-                const isSun = dow === 0;
-                headerHtml += `<th style="${isSun ? 'color:#ff9aad;opacity:0.7;' : ''}">${d.day}${isSun ? '<br><span style="font-size:0.65rem;">Sun</span>' : ''}</th>`;
-            });
+            days.forEach(d => headerHtml += `<th>${d.day}</th>`);
             headerHtml += '<th>P</th><th>A</th><th>L</th><th>%</th></tr>';
             document.getElementById('monthlyTableHead').innerHTML = headerHtml;
 
@@ -2212,9 +3211,8 @@
                 bodyHtml += `<tr><td>${roll}</td><td>${name}</td>`;
                 
                 days.forEach(d => {
-                    const dow = new Date(year, month, d.day).getDay();
-                    if (dow === 0) {
-                        bodyHtml += `<td style="color:var(--text-light);background:rgba(124,168,139,0.07)!important;opacity:0.6;">-</td>`;
+                    if (isSundayHolidayDateKey(d.dateKey)) {
+                        bodyHtml += `<td>-</td>`;
                         return;
                     }
                     const att = data.attendance[d.dateKey];
@@ -2244,9 +3242,8 @@
 
             let footerHtml = '<tr><td>CLASS TOTAL</td><td>-</td>';
             days.forEach(d => {
-                const dow = new Date(year, month, d.day).getDay();
-                if (dow === 0) {
-                    footerHtml += `<td style="color:var(--text-light);opacity:0.6;">-</td>`;
+                if (isSundayHolidayDateKey(d.dateKey)) {
+                    footerHtml += '<td>-</td>';
                     return;
                 }
                 const att = data.attendance[d.dateKey];
@@ -2269,7 +3266,106 @@
             document.getElementById('monthlyAvgAttendance').textContent = avgPct + '%';
         }
 
+        function renderPeriodMonthlyReport() {
+            const year = reportMonth.getFullYear();
+            const month = reportMonth.getMonth();
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'];
+
+            document.getElementById('monthlyTitle').textContent = `${monthNames[month]} ${year}`;
+
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const days = [];
+            for (let d = 1; d <= daysInMonth; d++) {
+                days.push(`${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+            }
+
+            let headerHtml = '<tr><th>Roll Number</th><th>Name</th>';
+            days.forEach((dateKey, index) => headerHtml += `<th>${index + 1}</th>`);
+            headerHtml += '<th>PP</th><th>AP</th><th>%</th></tr>';
+            document.getElementById('monthlyTableHead').innerHTML = headerHtml;
+
+            let bodyHtml = '';
+            let totalPresentPeriods = 0;
+            let totalAbsentPeriods = 0;
+            let recordedDays = 0;
+
+            data.students.forEach(student => {
+                let studentPresentPeriods = 0;
+                let studentAbsentPeriods = 0;
+
+                bodyHtml += `<tr><td>${student.roll}</td><td>${student.name}</td>`;
+
+                days.forEach(dateKey => {
+                    if (isSundayHolidayDateKey(dateKey)) {
+                        bodyHtml += '<td>-</td>';
+                        return;
+                    }
+                    const periods = getStudentPeriodRecord(dateKey, student.roll);
+                    if (hasMeaningfulPeriodRecord(periods)) {
+                        const presentCount = getPeriodPresentCount(periods);
+                        const markedCount = getPeriodMarkedCount(periods);
+                        studentPresentPeriods += presentCount;
+                        studentAbsentPeriods += markedCount - presentCount;
+                        bodyHtml += `<td><button class="period-count-btn" onclick="openPeriodDetails('${dateKey}', '${student.roll}')">${presentCount}</button></td>`;
+                    } else {
+                        bodyHtml += '<td>-</td>';
+                    }
+                });
+
+                const markedPeriods = studentPresentPeriods + studentAbsentPeriods;
+                const pct = markedPeriods > 0 ? ((studentPresentPeriods / markedPeriods) * 100).toFixed(0) : 0;
+
+                bodyHtml += `<td style="background: rgba(25, 245, 138, 0.16); color: var(--accent);">${studentPresentPeriods}</td>`;
+                bodyHtml += `<td style="background: rgba(255, 77, 109, 0.16); color: #ff9aad;">${studentAbsentPeriods}</td>`;
+                bodyHtml += `<td style="background: rgba(69, 240, 255, 0.14); color: var(--info); font-weight: bold;">${pct}%</td></tr>`;
+
+                totalPresentPeriods += studentPresentPeriods;
+                totalAbsentPeriods += studentAbsentPeriods;
+            });
+
+            document.getElementById('monthlyTableBody').innerHTML = bodyHtml;
+
+            let footerHtml = '<tr><td>CLASS TOTAL</td><td>-</td>';
+            days.forEach(dateKey => {
+                if (isSundayHolidayDateKey(dateKey)) {
+                    footerHtml += '<td>-</td>';
+                    return;
+                }
+                let hasDayData = false;
+                let dayPresentCount = 0;
+                data.students.forEach(student => {
+                    const periods = getStudentPeriodRecord(dateKey, student.roll);
+                    if (hasMarkedAcademicPeriodRecord(periods)) {
+                        hasDayData = true;
+                        dayPresentCount += getPeriodPresentCount(periods);
+                    }
+                });
+                if (hasDayData) {
+                    recordedDays++;
+                    footerHtml += `<td>${dayPresentCount}</td>`;
+                } else {
+                    footerHtml += '<td>-</td>';
+                }
+            });
+
+            const totalMarkedPeriods = totalPresentPeriods + totalAbsentPeriods;
+            const avgPct = totalMarkedPeriods > 0 ? ((totalPresentPeriods / totalMarkedPeriods) * 100).toFixed(0) : 0;
+            footerHtml += `<td>${totalPresentPeriods}</td><td>${totalAbsentPeriods}</td><td>${avgPct}%</td></tr>`;
+            document.getElementById('monthlyTableFoot').innerHTML = footerHtml;
+
+            document.getElementById('monthlyTotalDays').textContent = recordedDays;
+            document.getElementById('monthlyTotalPresent').textContent = totalPresentPeriods;
+            document.getElementById('monthlyTotalAbsent').textContent = totalAbsentPeriods;
+            document.getElementById('monthlyAvgAttendance').textContent = avgPct + '%';
+        }
+
         function renderStudentMonthlyView() {
+            if (activeMonthlyMode === 'period') {
+                renderStudentPeriodMonthlyView();
+                return;
+            }
+
             const year = reportMonth.getFullYear();
             const month = reportMonth.getMonth();
 
@@ -2286,13 +3382,16 @@
             for (let d = 1; d <= daysInMonth; d++) {
                 const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 const dateObj = new Date(year, month, d);
-                const isSunday = dateObj.getDay() === 0;
+                const isSunday = isSundayHoliday(dateObj);
                 const att = data.attendance[dateKey];
-                const status = (!isSunday && att) ? (att[currentUser.roll] || null) : null;
+                const status = att ? (att[currentUser.roll] || null) : null;
 
                 allDays.push({ day: d, dateKey, status, dayName: dayNames[dateObj.getDay()], isSunday });
 
-                if (isSunday) continue; // don't count Sundays
+                if (isSunday) {
+                    continue;
+                }
+
                 if (status === 'present') p++;
                 else if (status === 'absent') a++;
                 else if (status === 'late') l++;
@@ -2363,31 +3462,18 @@
                            text-transform: uppercase; font-size: 0.9rem;">📅 Daily Attendance</h4>
                 <div>
                     ${allDays.map(r => {
-                        if (r.isSunday) {
-                            return `
-                                <div class="attendance-item" style="background: rgba(124,168,139,0.04); border-radius: 8px; margin-bottom: 2px; opacity: 0.6;">
-                                    <div class="student-info">
-                                        <div class="student-avatar" style="color: var(--text-light); font-size: 1rem; font-weight: 700;">
-                                            ${String(r.day).padStart(2, '0')}
-                                        </div>
-                                        <div>
-                                            <div style="font-weight: 600; font-size: 0.95rem;">${r.dateKey}</div>
-                                            <div style="font-size: 0.78rem; color: var(--text-light);">${r.dayName}</div>
-                                        </div>
-                                    </div>
-                                    <span class="badge" style="color: var(--text-light); background: rgba(124,168,139,0.1);">HOLIDAY</span>
-                                </div>
-                            `;
-                        }
-                        const statusClass  = r.status === 'present' ? 'badge-present' :
+                        const statusClass  = r.isSunday ? '' :
+                                            r.status === 'present' ? 'badge-present' :
                                             r.status === 'absent'  ? 'badge-absent'  :
                                             r.status === 'late'    ? 'badge-late'    : '';
-                        const statusLabel  = r.status ? r.status.toUpperCase() : 'NO RECORD';
-                        const rowBg        = r.status === 'present' ? 'rgba(25,245,138,0.04)' :
+                        const statusLabel  = r.isSunday ? '-' : (r.status ? r.status.toUpperCase() : 'NO RECORD');
+                        const rowBg        = r.isSunday ? 'transparent' :
+                                            r.status === 'present' ? 'rgba(25,245,138,0.04)' :
                                             r.status === 'absent'  ? 'rgba(255,77,109,0.04)' :
                                             r.status === 'late'    ? 'rgba(255,179,71,0.04)' :
                                                                      'transparent';
-                        const avatarColor  = r.status === 'present' ? 'var(--accent)' :
+                        const avatarColor  = r.isSunday ? 'var(--text-light)' :
+                                            r.status === 'present' ? 'var(--accent)' :
                                             r.status === 'absent'  ? '#ff9aad' :
                                             r.status === 'late'    ? '#ffd28a' :
                                                                      'var(--text-light)';
@@ -2400,11 +3486,11 @@
                                     </div>
                                     <div>
                                         <div style="font-weight: 600; font-size: 0.95rem;">${r.dateKey}</div>
-                                        <div style="font-size: 0.78rem; color: var(--text-light);">${r.dayName}</div>
+                                        <div style="font-size: 0.78rem; color: var(--text-light);">${r.dayName}${r.isSunday ? ' • Holiday' : ''}</div>
                                     </div>
                                 </div>
                                 <span class="badge ${statusClass}"
-                                      style="${!r.status ? 'color: var(--text-light); background: rgba(124,168,139,0.1);' : ''}">
+                                      style="${(!r.status || r.isSunday) ? 'color: var(--text-light); background: rgba(124,168,139,0.1);' : ''}">
                                     ${statusLabel}
                                 </span>
                             </div>
@@ -2414,8 +3500,112 @@
             `;
         }
 
+        function renderStudentPeriodMonthlyView() {
+            const year = reportMonth.getFullYear();
+            const month = reportMonth.getMonth();
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'];
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+            document.getElementById('monthlyTitle').textContent = `${monthNames[month]} ${year}`;
+
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const allDays = [];
+            let totalPresentPeriods = 0;
+            let totalMarkedPeriods = 0;
+            let recordedDays = 0;
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const periods = getStudentPeriodRecord(dateKey, currentUser.roll);
+                const dateObj = new Date(year, month, d);
+                const isSunday = isSundayHoliday(dateObj);
+                const presentCount = getPeriodPresentCount(periods);
+                const markedCount = getPeriodMarkedCount(periods);
+
+                if (!isSunday && hasMarkedAcademicPeriodRecord(periods)) {
+                    totalPresentPeriods += presentCount;
+                    totalMarkedPeriods += markedCount;
+                    recordedDays++;
+                }
+
+                allDays.push({
+                    day: d,
+                    dateKey,
+                    periods,
+                    presentCount,
+                    dayName: dayNames[dateObj.getDay()],
+                    isSunday
+                });
+            }
+
+            const pct = totalMarkedPeriods > 0 ? ((totalPresentPeriods / totalMarkedPeriods) * 100).toFixed(1) : 0;
+            const absentPeriods = totalMarkedPeriods - totalPresentPeriods;
+            const pctNum = parseFloat(pct);
+            const pctColor = pctNum >= 75 ? 'var(--accent)' : pctNum >= 50 ? '#ffd28a' : '#ff9aad';
+
+            document.getElementById('studentMonthlyList').innerHTML = `
+                <div style="background: rgba(3,8,5,0.95); padding: 22px; border-radius: 14px;
+                            margin-bottom: 24px; border: 1px solid rgba(25,245,138,0.18);
+                            box-shadow: var(--shadow);">
+                    <h4 style="color: var(--primary); margin-bottom: 16px; letter-spacing: 0.06em;
+                               text-transform: uppercase; font-size: 0.95rem;">
+                        Period-wise Summary for ${currentUser.roll}
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; text-align: center;">
+                        <div style="background: rgba(25,245,138,0.08); border: 1px solid rgba(25,245,138,0.2); border-radius: 10px; padding: 14px;">
+                            <div style="font-size: 2rem; font-weight: bold; color: var(--accent);">${totalPresentPeriods}</div>
+                            <div style="color: var(--text-light); font-size: 0.8rem; margin-top: 4px;">Present Periods</div>
+                        </div>
+                        <div style="background: rgba(255,77,109,0.08); border: 1px solid rgba(255,77,109,0.2); border-radius: 10px; padding: 14px;">
+                            <div style="font-size: 2rem; font-weight: bold; color: #ff9aad;">${absentPeriods}</div>
+                            <div style="color: var(--text-light); font-size: 0.8rem; margin-top: 4px;">Absent Periods</div>
+                        </div>
+                        <div style="background: rgba(69,240,255,0.08); border: 1px solid rgba(69,240,255,0.2); border-radius: 10px; padding: 14px;">
+                            <div style="font-size: 2rem; font-weight: bold; color: var(--info);">${recordedDays}</div>
+                            <div style="color: var(--text-light); font-size: 0.8rem; margin-top: 4px;">Days Recorded</div>
+                        </div>
+                        <div style="background: rgba(255,179,71,0.08); border: 1px solid rgba(255,179,71,0.2); border-radius: 10px; padding: 14px;">
+                            <div style="font-size: 2rem; font-weight: bold; color: ${pctColor};">${pct}%</div>
+                            <div style="color: var(--text-light); font-size: 0.8rem; margin-top: 4px;">Rate</div>
+                        </div>
+                    </div>
+                </div>
+                <h4 style="color: var(--primary); margin-bottom: 14px; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.9rem;">Daily Period-wise Attendance</h4>
+                <div>
+                    ${allDays.map(r => `
+                        <div class="attendance-item" style="border-radius: 8px; margin-bottom: 6px; background: rgba(6,18,12,0.88); align-items: flex-start;">
+                            <div style="flex: 1;">
+                                <div class="student-info">
+                                    <div class="student-avatar">${String(r.day).padStart(2, '0')}</div>
+                                    <div>
+                                        <div style="font-weight: 600;">${r.dateKey}</div>
+                                        <div style="font-size: 0.78rem; color: var(--text-light);">${r.dayName}${r.isSunday ? ' • Holiday' : ''}</div>
+                                    </div>
+                                </div>
+                                ${!r.isSunday && hasMeaningfulPeriodRecord(r.periods) ? renderPeriodStatusBadges(r.periods) : ''}
+                            </div>
+                            <div>
+                                ${r.isSunday
+                                    ? `<span class="badge" style="color: var(--text-light); background: rgba(124,168,139,0.1);">-</span>`
+                                    : hasMeaningfulPeriodRecord(r.periods)
+                                    ? `<button class="period-count-btn" onclick="openPeriodDetails('${r.dateKey}', '${currentUser.roll}')">${r.presentCount}/${getAcademicPeriodCount(parseDateKey(r.dateKey))}</button>`
+                                    : `<span class="badge" style="color: var(--text-light); background: rgba(124,168,139,0.1);">NO RECORD</span>`
+                                }
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
         // Download Functions
         function downloadMonthlyReport() {
+            if (activeMonthlyMode === 'period') {
+                downloadPeriodMonthlyReport();
+                return;
+            }
+
             const year = reportMonth.getFullYear();
             const month = reportMonth.getMonth() + 1;
             const daysInMonth = new Date(year, month, 0).getDate();
@@ -2432,8 +3622,10 @@
                 
                 for (let d = 1; d <= daysInMonth; d++) {
                     const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                    const dow = new Date(year, month - 1, d).getDay();
-                    if (dow === 0) { csv += ',Sun'; continue; }
+                    if (isSundayHolidayDateKey(dateKey)) {
+                        csv += ',-';
+                        continue;
+                    }
                     const att = data.attendance[dateKey];
                     if (att && att[roll]) {
                         const status = att[roll];
@@ -2455,6 +3647,11 @@
         }
 
         function downloadIndividualReport() {
+            if (activeMonthlyMode === 'period') {
+                downloadPeriodIndividualReport();
+                return;
+            }
+
             const roll = document.getElementById('individualStudentSelect').value;
             if (!roll) {
                 showToast('Please select a student!');
@@ -2470,11 +3667,10 @@
 
             for (let d = 1; d <= daysInMonth; d++) {
                 const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                const dow = new Date(year, month - 1, d).getDay();
-                if (dow === 0) { csv += `${dateKey},Sunday,Holiday\n`; continue; }
+                const isSunday = isSundayHolidayDateKey(dateKey);
                 const att = data.attendance[dateKey];
-                let status = 'Not Recorded';
-                if (att && att[roll]) {
+                let status = isSunday ? '-' : 'Not Recorded';
+                if (!isSunday && att && att[roll]) {
                     status = att[roll];
                     if (status === 'present') p++;
                     else if (status === 'absent') a++;
@@ -2489,6 +3685,124 @@
             csv += `\nSummary\nTotal Present,${p}\nTotal Absent,${a}\nTotal Late,${l}\nAttendance Percentage,${pct}%\n`;
 
             downloadCSV(csv, `individual_report_${roll}_${year}_${month}.csv`);
+        }
+
+        function downloadPeriodMonthlyReport() {
+            const year = reportMonth.getFullYear();
+            const month = reportMonth.getMonth() + 1;
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            let csv = 'Roll Number,Name';
+            for (let d = 1; d <= daysInMonth; d++) csv += `,${d}`;
+            csv += ',Present Periods,Absent Periods,Percentage\n';
+
+            data.students.forEach(student => {
+                let presentPeriods = 0;
+                let absentPeriods = 0;
+                csv += `${student.roll},${student.name}`;
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    if (isSundayHolidayDateKey(dateKey)) {
+                        csv += ',-';
+                        continue;
+                    }
+                    const periods = getStudentPeriodRecord(dateKey, student.roll);
+                    if (hasMeaningfulPeriodRecord(periods)) {
+                        const presentCount = getPeriodPresentCount(periods);
+                        const markedCount = getPeriodMarkedCount(periods);
+                        presentPeriods += presentCount;
+                        absentPeriods += markedCount - presentCount;
+                        csv += `,${presentCount}/${PERIOD_COUNT}`;
+                    } else {
+                        csv += ',-';
+                    }
+                }
+
+                const markedPeriods = presentPeriods + absentPeriods;
+                const pct = markedPeriods > 0 ? ((presentPeriods / markedPeriods) * 100).toFixed(1) : 0;
+                csv += `,${presentPeriods},${absentPeriods},${pct}%\n`;
+            });
+
+            downloadCSV(csv, `period_monthly_report_${year}_${month}.csv`);
+        }
+
+        function downloadPeriodIndividualReport() {
+            const roll = document.getElementById('individualStudentSelect').value;
+            if (!roll) {
+                showToast('Please select a student!');
+                return;
+            }
+
+            const year = reportMonth.getFullYear();
+            const month = reportMonth.getMonth() + 1;
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            let csv = 'Date,Present Count,Marked Periods';
+            for (let p = 1; p <= PERIOD_COUNT; p++) csv += `,Period ${p}`;
+            csv += '\n';
+
+            let totalPresentPeriods = 0;
+            let totalMarkedPeriods = 0;
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                if (isSundayHolidayDateKey(dateKey)) {
+                    csv += `${dateKey},-,-,${Array.from({ length: PERIOD_COUNT }, () => '-').join(',')}\n`;
+                    continue;
+                }
+                const periods = getStudentPeriodRecord(dateKey, roll);
+
+                if (hasMeaningfulPeriodRecord(periods)) {
+                    const presentCount = getPeriodPresentCount(periods);
+                    const markedCount = getPeriodMarkedCount(periods);
+                    totalPresentPeriods += presentCount;
+                    totalMarkedPeriods += markedCount;
+                    csv += `${dateKey},${presentCount},${markedCount},${periods.map(status => status.toUpperCase()).join(',')}\n`;
+                } else {
+                    csv += `${dateKey},0,0,${Array.from({ length: PERIOD_COUNT }, () => 'NOT MARKED').join(',')}\n`;
+                }
+            }
+
+            const absentPeriods = totalMarkedPeriods - totalPresentPeriods;
+            const pct = totalMarkedPeriods > 0 ? ((totalPresentPeriods / totalMarkedPeriods) * 100).toFixed(1) : 0;
+            csv += `\nSummary\nPresent Periods,${totalPresentPeriods}\nAbsent Periods,${absentPeriods}\nMarked Periods,${totalMarkedPeriods}\nAttendance Percentage,${pct}%\n`;
+
+            downloadCSV(csv, `period_individual_report_${roll}_${year}_${month}.csv`);
+        }
+
+        function openPeriodDetails(dateKey, roll) {
+            const periods = getStudentPeriodRecord(dateKey, roll);
+            const student = data.students.find(item => item.roll === roll);
+            const studentName = student?.name || roll;
+            const presentCount = getPeriodPresentCount(periods);
+            const academicCount = getAcademicPeriodCount(parseDateKey(dateKey));
+
+            document.getElementById('periodDetailsTitle').textContent = `${roll} - ${studentName} - ${dateKey}`;
+            document.getElementById('periodDetailsContent').innerHTML = hasMeaningfulPeriodRecord(periods)
+                ? `
+                    <div style="margin-bottom: 16px; color: var(--text-light);">
+                        Present periods: <strong style="color: var(--primary);">${presentCount}/${academicCount}</strong>
+                    </div>
+                    <div class="period-detail-grid">
+                        ${periods.map((status, index) => `
+                            <div class="period-detail-card">
+                                <h4>${PERIOD_SESSION_SCHEDULE[index].label}</h4>
+                                <span class="badge ${
+                                    status === 'present' ? 'badge-present' :
+                                    status === 'absent' ? 'badge-absent' : ''
+                                }" style="${
+                                    status === 'sports' || status === 'unmarked'
+                                        ? 'color: var(--text-light); background: rgba(124, 168, 139, 0.1);'
+                                        : ''
+                                }">${status.toUpperCase()}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `
+                : '<p style="color: var(--text-light);">No period-wise attendance recorded for this date.</p>';
+
+            document.getElementById('periodDetailsModal').classList.add('active');
         }
 
         function downloadCSV(content, filename) {
@@ -2535,21 +3849,39 @@
             for (let day = 1; day <= daysInMonth; day++) {
                 const date = new Date(year, month, day);
                 const dateKey = formatDateKey(date);
+                const isSunday = isSundayHoliday(date);
                 const isToday = date.toDateString() === today.toDateString();
                 const isSelected = date.toDateString() === selectedDate.toDateString();
-                const hasData = data.attendance[dateKey] && Object.keys(data.attendance[dateKey]).length > 0;
+                const regularAttendance = data.attendance[dateKey];
+                const periodAttendance = data.periodAttendance[dateKey];
+                const hasRegularData = regularAttendance && Object.keys(regularAttendance).length > 0;
+                const hasPeriodData = periodAttendance && Object.keys(periodAttendance).length > 0;
+                const hasData = hasRegularData || hasPeriodData;
 
                 let stats = '';
-                if (hasData && isAdminUser()) {
-                    const att = data.attendance[dateKey];
-                    const present = Object.values(att).filter(s => s === 'present').length;
-                    const absent = Object.values(att).filter(s => s === 'absent').length;
-                    stats = `<div class="attendance-summary">${present}P/${absent}A</div>`;
+                if (isSunday) {
+                    stats = `<div class="attendance-summary">HOL</div>`;
+                } else if (hasData && isStaffUser()) {
+                    if (hasRegularData) {
+                        const present = Object.values(regularAttendance).filter(s => s === 'present').length;
+                        const absent = Object.values(regularAttendance).filter(s => s === 'absent').length;
+                        stats = `<div class="attendance-summary">${present}P/${absent}A</div>`;
+                    } else {
+                        let presentPeriods = 0;
+                        Object.values(periodAttendance).forEach(periods => {
+                            if (Array.isArray(periods)) {
+                                presentPeriods += getPeriodPresentCount(periods);
+                            }
+                        });
+                        stats = `<div class="attendance-summary">${presentPeriods} PP</div>`;
+                    }
                 } else if (hasData && currentUser.type === 'student') {
-                    const att = data.attendance[dateKey];
-                    const status = att[currentUser.roll];
+                    const status = regularAttendance?.[currentUser.roll];
                     if (status) {
                         stats = `<div class="attendance-summary">${status.charAt(0).toUpperCase()}</div>`;
+                    } else if (Array.isArray(periodAttendance?.[currentUser.roll])) {
+                        const presentCount = getPeriodPresentCount(periodAttendance[currentUser.roll]);
+                        stats = `<div class="attendance-summary">${presentCount}/${PERIOD_COUNT}</div>`;
                     }
                 }
 
@@ -2591,32 +3923,85 @@
                 selectedDate.toLocaleDateString('en-US', options);
 
             const att = data.attendance[dateKey] || {};
+            const periodAtt = data.periodAttendance[dateKey] || {};
+            const isSunday = isSundayHoliday(selectedDate);
 
             if (currentUser.type === 'student') {
                 const status = att[currentUser.roll] || 'No record';
-                const statusClass = status === 'present' ? 'badge-present' : 
-                                   status === 'absent' ? 'badge-absent' : 
-                                   status === 'late' ? 'badge-late' : '';
-
-                list.innerHTML = `
-                    <div class="attendance-item">
-                        <div class="student-info">
-                            <div class="student-avatar">${currentUser.roll.slice(-3)}</div>
-                            <div><div style="font-weight: 600;">${currentUser.roll}</div></div>
+                const periods = getStudentPeriodRecord(dateKey, currentUser.roll);
+                if (isSunday) {
+                    list.innerHTML = `
+                        <div class="attendance-item">
+                            <div class="student-info">
+                                <div class="student-avatar">${currentUser.roll.slice(-3)}</div>
+                                <div><div style="font-weight: 600;">${currentUser.roll}</div></div>
+                            </div>
+                            <span class="badge" style="color: var(--text-light); background: rgba(124, 168, 139, 0.1);">SUNDAY HOLIDAY</span>
                         </div>
-                        <span class="badge ${statusClass}">${status.toUpperCase()}</span>
-                    </div>
-                `;
+                    `;
+                } else if (status !== 'No record') {
+                    const statusClass = status === 'present' ? 'badge-present' : 
+                                       status === 'absent' ? 'badge-absent' : 
+                                       status === 'late' ? 'badge-late' : '';
+
+                    list.innerHTML = `
+                        <div class="attendance-item">
+                            <div class="student-info">
+                                <div class="student-avatar">${currentUser.roll.slice(-3)}</div>
+                                <div><div style="font-weight: 600;">${currentUser.roll}</div></div>
+                            </div>
+                            <span class="badge ${statusClass}">${status.toUpperCase()}</span>
+                        </div>
+                    `;
+                } else if (hasMeaningfulPeriodRecord(periods)) {
+                    list.innerHTML = `
+                        <div class="attendance-item">
+                            <div class="student-info">
+                                <div class="student-avatar">${currentUser.roll.slice(-3)}</div>
+                                <div><div style="font-weight: 600;">${currentUser.roll}</div></div>
+                            </div>
+                            <button class="period-count-btn" onclick="openPeriodDetails('${dateKey}', '${currentUser.roll}')">${getPeriodPresentCount(periods)}/${getAcademicPeriodCount(selectedDate)}</button>
+                        </div>
+                    `;
+                } else {
+                    list.innerHTML = `
+                        <div class="attendance-item">
+                            <div class="student-info">
+                                <div class="student-avatar">${currentUser.roll.slice(-3)}</div>
+                                <div><div style="font-weight: 600;">${currentUser.roll}</div></div>
+                            </div>
+                            <span class="badge" style="color: var(--text-light); background: rgba(124, 168, 139, 0.1);">NO RECORD</span>
+                        </div>
+                    `;
+                }
             } else {
-                if (Object.keys(att).length === 0) {
+                if (isSunday) {
+                    list.innerHTML = '<p style="text-align: center; color: var(--text-light); padding: 20px;">Sunday holiday</p>';
+                } else if (Object.keys(att).length === 0 && Object.keys(periodAtt).length === 0) {
                     list.innerHTML = '<p style="text-align: center; color: var(--text-light); padding: 20px;">No attendance recorded</p>';
                 } else {
                     list.innerHTML = data.students.map(student => {
                         const roll = student.roll;
                         const name = student.name;
-                        const status = att[roll] || 'absent';
-                        const statusClass = status === 'present' ? 'badge-present' : 
-                                           status === 'absent' ? 'badge-absent' : 'badge-late';
+                        if (att[roll]) {
+                            const status = att[roll];
+                            const statusClass = status === 'present' ? 'badge-present' : 
+                                               status === 'absent' ? 'badge-absent' : 'badge-late';
+                            return `
+                                <div class="attendance-item" style="padding: 10px;">
+                                    <div class="student-info">
+                                        <div class="student-avatar" style="width: 32px; height: 32px; font-size: 0.8rem;">${roll.slice(-3)}</div>
+                                        <div>
+                                            <div style="font-weight: 500; font-size: 0.9rem;">${roll}</div>
+                                            <div style="font-size: 0.8rem; color: var(--text-light);">${name}</div>
+                                        </div>
+                                    </div>
+                                    <span class="badge ${statusClass}">${status.charAt(0).toUpperCase()}</span>
+                                </div>
+                            `;
+                        }
+
+                        const periods = getStudentPeriodRecord(dateKey, roll);
                         return `
                             <div class="attendance-item" style="padding: 10px;">
                                 <div class="student-info">
@@ -2626,7 +4011,10 @@
                                         <div style="font-size: 0.8rem; color: var(--text-light);">${name}</div>
                                     </div>
                                 </div>
-                                <span class="badge ${statusClass}">${status.charAt(0).toUpperCase()}</span>
+                                ${hasMeaningfulPeriodRecord(periods)
+                                    ? `<button class="period-count-btn" onclick="openPeriodDetails('${dateKey}', '${roll}')">${getPeriodPresentCount(periods)}/${getAcademicPeriodCount(selectedDate)}</button>`
+                                    : `<span class="badge" style="color: var(--text-light); background: rgba(124, 168, 139, 0.1);">NO RECORD</span>`
+                                }
                             </div>
                         `;
                     }).join('');
