@@ -2143,11 +2143,17 @@
         function filterStudents() {
             renderAttendanceList(document.getElementById('searchInput').value);
         }
-
-        function saveAttendance() {
-            saveToStorage();
-            showToast('✅ Attendance saved successfully!');
+      
+       function saveAttendance() {
+          const date = document.getElementById('attendanceDate').value;
+    
+       // ✅ NEW: Block attendance on Sundays
+          const selectedDay = new Date(date + 'T00:00:00').getDay(); // 0 = Sunday
+        if (selectedDay === 0) {
+        showToast('❌ Attendance cannot be marked on Sundays!');
+        return;
         }
+   
 
         // Format date key
         function formatDateKey(date) {
