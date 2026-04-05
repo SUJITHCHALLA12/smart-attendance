@@ -2057,7 +2057,10 @@
         // CR Attendance Marking
         function changeAttendanceDate() {
             const dateInput = document.getElementById('attendanceDate').value;
-            selectedDate = new Date(dateInput);
+            selectedDate = new Date(dateInput + 'T00:00:00');
+            if (selectedDate.getDay() === 0) {
+                showToast('⚠️ Sunday is a holiday — attendance cannot be marked!');
+            }
             renderAttendanceList();
         }
 
@@ -2113,6 +2116,7 @@
         }
 
         function setStatus(roll, status) {
+            if (selectedDate.getDay() === 0) { showToast('❌ Cannot mark attendance on Sundays!'); return; }
             const dateKey = formatDateKey(selectedDate);
             if (!data.attendance[dateKey]) {
                 data.attendance[dateKey] = {};
@@ -2123,6 +2127,7 @@
         }
 
         function markAllPresent() {
+            if (selectedDate.getDay() === 0) { showToast('❌ Cannot mark attendance on Sundays!'); return; }
             const dateKey = formatDateKey(selectedDate);
             if (!data.attendance[dateKey]) data.attendance[dateKey] = {};
             data.students.forEach(student => data.attendance[dateKey][student.roll] = 'present');
@@ -2132,6 +2137,7 @@
         }
 
         function markAllAbsent() {
+            if (selectedDate.getDay() === 0) { showToast('❌ Cannot mark attendance on Sundays!'); return; }
             const dateKey = formatDateKey(selectedDate);
             if (!data.attendance[dateKey]) data.attendance[dateKey] = {};
             data.students.forEach(student => data.attendance[dateKey][student.roll] = 'absent');
@@ -2144,20 +2150,20 @@
             renderAttendanceList(document.getElementById('searchInput').value);
         }
       
-       function saveAttendance() {
-          const date = document.getElementById('attendanceDate').value;
-    
-       // ✅ NEW: Block attendance on Sundays
-          const selectedDay = new Date(date + 'T00:00:00').getDay(); // 0 = Sunday
-        if (selectedDay === 0) {
-        showToast('❌ Attendance cannot be marked on Sundays!');
-        return;
-        }
-   
-
-        // Format date key
-        function formatDateKey(date) {
-            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        function saveAttendance() {
+            const dateKey = formatDateKey(selectedDate);
+            const selectedDay = selectedDate.getDay(); // 0 = Sunday
+            if (selectedDay === 0) {
+                showToast('❌ Attendance cannot be marked on Sundays!');
+                return;
+            }
+            if (!data.attendance[dateKey] || Object.keys(data.attendance[dateKey]).length === 0) {
+                showToast('No attendance changes to save!');
+                return;
+            }
+            saveToStorage();
+            showToast('✅ Attendance saved successfully!');
+            renderMonthlyReport && renderMonthlyReport();
         }
 
         // Monthly Report
@@ -2187,7 +2193,11 @@
             }
 
             let headerHtml = '<tr><th>Roll Number</th><th>Name</th>';
-            days.forEach(d => headerHtml += `<th>${d.day}</th>`);
+            days.forEach(d => {
+                const dow = new Date(year, month, d.day).getDay();
+                const isSun = dow === 0;
+                headerHtml += `<th style="${isSun ? 'color:#ff9aad;opacity:0.7;' : ''}">${d.day}${isSun ? '<br><span style="font-size:0.65rem;">Sun</span>' : ''}</th>`;
+            });
             headerHtml += '<th>P</th><th>A</th><th>L</th><th>%</th></tr>';
             document.getElementById('monthlyTableHead').innerHTML = headerHtml;
 
@@ -2202,6 +2212,11 @@
                 bodyHtml += `<tr><td>${roll}</td><td>${name}</td>`;
                 
                 days.forEach(d => {
+                    const dow = new Date(year, month, d.day).getDay();
+                    if (dow === 0) {
+                        bodyHtml += `<td style="color:var(--text-light);background:rgba(124,168,139,0.07)!important;opacity:0.6;">-</td>`;
+                        return;
+                    }
                     const att = data.attendance[d.dateKey];
                     if (att && Object.keys(att).length > 0) {
                         const status = att[roll];
@@ -2229,6 +2244,11 @@
 
             let footerHtml = '<tr><td>CLASS TOTAL</td><td>-</td>';
             days.forEach(d => {
+                const dow = new Date(year, month, d.day).getDay();
+                if (dow === 0) {
+                    footerHtml += `<td style="color:var(--text-light);opacity:0.6;">-</td>`;
+                    return;
+                }
                 const att = data.attendance[d.dateKey];
                 if (att && Object.keys(att).length > 0) {
                     recordedDays++;
@@ -2266,11 +2286,13 @@
             for (let d = 1; d <= daysInMonth; d++) {
                 const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 const dateObj = new Date(year, month, d);
+                const isSunday = dateObj.getDay() === 0;
                 const att = data.attendance[dateKey];
-                const status = att ? (att[currentUser.roll] || null) : null;
+                const status = (!isSunday && att) ? (att[currentUser.roll] || null) : null;
 
-                allDays.push({ day: d, dateKey, status, dayName: dayNames[dateObj.getDay()] });
+                allDays.push({ day: d, dateKey, status, dayName: dayNames[dateObj.getDay()], isSunday });
 
+                if (isSunday) continue; // don't count Sundays
                 if (status === 'present') p++;
                 else if (status === 'absent') a++;
                 else if (status === 'late') l++;
@@ -2341,6 +2363,22 @@
                            text-transform: uppercase; font-size: 0.9rem;">📅 Daily Attendance</h4>
                 <div>
                     ${allDays.map(r => {
+                        if (r.isSunday) {
+                            return `
+                                <div class="attendance-item" style="background: rgba(124,168,139,0.04); border-radius: 8px; margin-bottom: 2px; opacity: 0.6;">
+                                    <div class="student-info">
+                                        <div class="student-avatar" style="color: var(--text-light); font-size: 1rem; font-weight: 700;">
+                                            ${String(r.day).padStart(2, '0')}
+                                        </div>
+                                        <div>
+                                            <div style="font-weight: 600; font-size: 0.95rem;">${r.dateKey}</div>
+                                            <div style="font-size: 0.78rem; color: var(--text-light);">${r.dayName}</div>
+                                        </div>
+                                    </div>
+                                    <span class="badge" style="color: var(--text-light); background: rgba(124,168,139,0.1);">HOLIDAY</span>
+                                </div>
+                            `;
+                        }
                         const statusClass  = r.status === 'present' ? 'badge-present' :
                                             r.status === 'absent'  ? 'badge-absent'  :
                                             r.status === 'late'    ? 'badge-late'    : '';
@@ -2394,6 +2432,8 @@
                 
                 for (let d = 1; d <= daysInMonth; d++) {
                     const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    const dow = new Date(year, month - 1, d).getDay();
+                    if (dow === 0) { csv += ',Sun'; continue; }
                     const att = data.attendance[dateKey];
                     if (att && att[roll]) {
                         const status = att[roll];
@@ -2430,6 +2470,8 @@
 
             for (let d = 1; d <= daysInMonth; d++) {
                 const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const dow = new Date(year, month - 1, d).getDay();
+                if (dow === 0) { csv += `${dateKey},Sunday,Holiday\n`; continue; }
                 const att = data.attendance[dateKey];
                 let status = 'Not Recorded';
                 if (att && att[roll]) {
