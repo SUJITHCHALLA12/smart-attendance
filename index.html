@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart-Attendance</title>
+    <title>Attendance Management System</title>
     <style>
         * {
             margin: 0;
@@ -1566,6 +1566,7 @@
             { label: 'P6', startHour: 14, startMinute: 35, endHour: 15, endMinute: 25 },
             { label: 'P7', startHour: 15, startMinute: 25, endHour: 16, endMinute: 15 }
         ];
+        const STAFF_LOGIN_TYPE_KEY = 'smartAttendanceStaffLoginType';
         const FIREBASE_DATA_PATH = 'attendance-app/main';
         const FIREBASE_SDK_VERSION = '10.13.2';
         const FIREBASE_COMPAT_SOURCES = [
@@ -1630,6 +1631,7 @@
         let regularSessionInterval = null;
         let lastAutoSavedSessionDate = null;
         let lastAutoSavedPeriodSessions = {};
+        let authStateListenerInitialized = false;
 
         function normalizeData(raw = {}) {
             const base = createDefaultData();
@@ -2194,7 +2196,11 @@
 
             database = firebaseNamespace.database();
             authClient = firebaseNamespace.auth();
+            if (firebaseNamespace.auth?.Auth?.Persistence?.LOCAL) {
+                await authClient.setPersistence(firebaseNamespace.auth.Auth.Persistence.LOCAL);
+            }
             cloudRef = database.ref(FIREBASE_DATA_PATH);
+            initializeAuthStateListener();
             return true;
         }
 
@@ -2306,6 +2312,7 @@
         async function init() {
             populateRollNumbers();
             updateLoginUI();
+            syncLoginTypeSelector();
 
             const today = formatDateKey(new Date());
             document.getElementById('attendanceDate').value = today;
@@ -2318,6 +2325,35 @@
 
         function isAdminUser(user = currentUser) {
             return user?.type === 'cr' || user?.type === 'teacher';
+        }
+
+        function getStoredStaffLoginType() {
+            try {
+                const storedType = localStorage.getItem(STAFF_LOGIN_TYPE_KEY);
+                return storedType === 'cr' || storedType === 'teacher' || storedType === 'faculty'
+                    ? storedType
+                    : null;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function storeStaffLoginType(loginType) {
+            try {
+                if (loginType === 'cr' || loginType === 'teacher' || loginType === 'faculty') {
+                    localStorage.setItem(STAFF_LOGIN_TYPE_KEY, loginType);
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        function clearStoredStaffLoginType() {
+            try {
+                localStorage.removeItem(STAFF_LOGIN_TYPE_KEY);
+            } catch (error) {
+                console.error(error);
+            }
         }
 
         function isFacultyUser(user = currentUser) {
@@ -2344,6 +2380,59 @@
             if (loginType === 'teacher') return 'Class Teacher';
             if (loginType === 'faculty') return 'Faculty';
             return 'CR';
+        }
+
+        function createStaffSessionUser(loginType) {
+            return {
+                type: loginType,
+                roll: loginType === 'teacher'
+                    ? 'CLASS TEACHER'
+                    : loginType === 'faculty'
+                        ? 'FACULTY'
+                        : 'CR'
+            };
+        }
+
+        function syncLoginTypeSelector() {
+            const loginTypeSelect = document.getElementById('loginType');
+            if (!loginTypeSelect) return;
+
+            if (currentUser?.type === 'student') {
+                loginTypeSelect.value = 'student';
+            } else {
+                const storedType = getStoredStaffLoginType();
+                if (storedType) {
+                    loginTypeSelect.value = storedType;
+                }
+            }
+
+            updateLoginUI();
+        }
+
+        function initializeAuthStateListener() {
+            if (!authClient || authStateListenerInitialized) {
+                return;
+            }
+
+            authStateListenerInitialized = true;
+            authClient.onAuthStateChanged(user => {
+                const rememberedLoginType = getStoredStaffLoginType();
+
+                if (user && rememberedLoginType) {
+                    currentUser = createStaffSessionUser(rememberedLoginType);
+                    syncLoginTypeSelector();
+                    showDashboard();
+                    return;
+                }
+
+                if (!user && isStaffUser(currentUser)) {
+                    currentUser = null;
+                    clearStoredStaffLoginType();
+                    document.getElementById('loginPage').classList.remove('hidden');
+                    document.getElementById('dashboard').classList.add('hidden');
+                    syncLoginTypeSelector();
+                }
+            });
         }
 
         // Populate roll numbers dropdown
@@ -2419,14 +2508,9 @@
 
                 try {
                     await authClient.signInWithEmailAndPassword(email, password);
-                    currentUser = {
-                        type: loginType,
-                        roll: loginType === 'teacher'
-                            ? 'CLASS TEACHER'
-                            : loginType === 'faculty'
-                                ? 'FACULTY'
-                                : 'CR'
-                    };
+                    storeStaffLoginType(loginType);
+                    currentUser = createStaffSessionUser(loginType);
+                    syncLoginTypeSelector();
                     showDashboard();
                 } catch (error) {
                     console.error(error);
@@ -2445,7 +2529,7 @@
 
         // Logout handler
         async function handleLogout() {
-            if (isAdminUser() && authClient) {
+            if (isStaffUser() && authClient) {
                 try {
                     await authClient.signOut();
                 } catch (error) {
@@ -2454,10 +2538,12 @@
             }
 
             currentUser = null;
+            clearStoredStaffLoginType();
             document.getElementById('loginPage').classList.remove('hidden');
             document.getElementById('dashboard').classList.add('hidden');
             document.getElementById('crEmail').value = '';
             document.getElementById('crPassword').value = '';
+            syncLoginTypeSelector();
         }
 
         // Show dashboard
