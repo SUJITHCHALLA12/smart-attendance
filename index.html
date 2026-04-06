@@ -1471,9 +1471,29 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+    <script type="module">
+        import { initializeApp, getApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+        window.firebaseModular = {
+            initializeApp,
+            getApp,
+            getApps,
+            getDatabase,
+            ref,
+            get,
+            set,
+            onValue,
+            getAuth,
+            signInWithEmailAndPassword,
+            signOut,
+            onAuthStateChanged,
+            setPersistence,
+            browserLocalPersistence
+        };
+        window.dispatchEvent(new Event('firebase-modular-ready'));
+    </script>
     <script>
         const studentNamesMap = {
             "25HU1A05C7": "T.SARALA",
@@ -1481,16 +1501,16 @@
             "25HU1A05C9": "S.SHAKILA BEE",
             "25HU1A05D1": "M.SHANTHI KUMARI",
             "25HU1A05D2": "D.SHASHANK",
-            "25HU1A05D3": "D.SHASHA VALI",
+            "25HU1A05D3": "B.SHASHA VALI",
             "25HU1A05D4": "S.SHAZIYA NAZ",
             "25HU1A05D5": "SHIRIN TAJ",
             "25HU1A05D6": "SIDDI ARSHIYA",
-            "25HU1A05D7": "SIVA KUMAR",
+            "25HU1A05D7": "M.SIVA KUMAR",
             "25HU1A05D8": "V.SOMESHWAR",
             "25HU1A05D9": "S.SPANDANA",
             "25HU1A05E0": "G.SPOORTHI",
             "25HU1A05E1": "C.SREEKANTH",
-            "25HU1A05E2": "SRI ANJALI",
+            "25HU1A05E2": "N.SRI ANJALI",
             "25HU1A05E3": "P.SRUTHI PRASANTHI",
             "25HU1A05E4": "SUDHA RANI",
             "25HU1A05E5": "A.SUHASH",
@@ -1569,18 +1589,6 @@
         const STAFF_LOGIN_TYPE_KEY = 'smartAttendanceStaffLoginType';
         const FIREBASE_DATA_PATH = 'attendance-app/main';
         const FIREBASE_SDK_VERSION = '10.13.2';
-        const FIREBASE_COMPAT_SOURCES = [
-            [
-                `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-app-compat.js`,
-                `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-database-compat.js`,
-                `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-auth-compat.js`
-            ],
-            [
-                `https://cdn.jsdelivr.net/npm/firebase@${FIREBASE_SDK_VERSION}/firebase-app-compat.js`,
-                `https://cdn.jsdelivr.net/npm/firebase@${FIREBASE_SDK_VERSION}/firebase-database-compat.js`,
-                `https://cdn.jsdelivr.net/npm/firebase@${FIREBASE_SDK_VERSION}/firebase-auth-compat.js`
-            ]
-        ];
         // Firebase Realtime Database rules to apply in the Firebase console:
         // {
         //   "rules": {
@@ -1621,10 +1629,18 @@
         let activeMonthlyMode = 'regular';
         let studentTodayMode = 'regular';
         let studentWeeklyMode = 'regular';
+        let firebaseApi = null;
+        let firebaseApp = null;
         let database = null;
         let cloudRef = null;
         let authClient = null;
+        let firebaseAuthUser = null;
+        let currentRole = null;
+        let authRoleLoaded = false;
+        let authRoleResolve = null;
+        let authRoleReadyPromise = new Promise(resolve => authRoleResolve = resolve);
         let saveTimer = null;
+        let attendanceSaveTimers = {};
         let isApplyingRemoteUpdate = false;
         let pendingPush = false;
         let firebaseSdkPromise = null;
@@ -2031,11 +2047,14 @@
             const todayKey = formatDateKey(today);
             const regularSession = getRegularSessionState(today);
             let hasAutoSaved = false;
+            let hasRegularAutoSaved = false;
+            let hasPeriodAutoSaved = false;
 
-            if (regularSession.state === 'ended' && lastAutoSavedSessionDate !== todayKey) {
+            if (canManageRegularAttendance() && regularSession.state === 'ended' && lastAutoSavedSessionDate !== todayKey) {
                 finalizeRegularAttendance(todayKey);
                 lastAutoSavedSessionDate = todayKey;
                 hasAutoSaved = true;
+                hasRegularAutoSaved = true;
                 showToast('Regular attendance session ended. Unmarked students were finalized as absent and auto-saved.');
             }
 
@@ -2043,10 +2062,11 @@
                 const session = getPeriodSessionState(index, today);
                 const sessionKey = `${todayKey}:${index}`;
 
-                if ((session.state === 'ended' || session.state === 'sports') && !lastAutoSavedPeriodSessions[sessionKey]) {
+                if (canManagePeriodAttendance() && (session.state === 'ended' || session.state === 'sports') && !lastAutoSavedPeriodSessions[sessionKey]) {
                     finalizePeriodSession(todayKey, index);
                     lastAutoSavedPeriodSessions[sessionKey] = true;
                     hasAutoSaved = true;
+                    hasPeriodAutoSaved = true;
 
                     if (session.state === 'ended') {
                         showToast(`${period.label} session ended. Unmarked students were finalized as absent and auto-saved.`);
@@ -2055,7 +2075,8 @@
             });
 
             if (hasAutoSaved) {
-                saveToStorage();
+                if (hasRegularAutoSaved) saveRegularAttendance(todayKey);
+                if (hasPeriodAutoSaved) savePeriodAttendance(todayKey);
             }
 
             if (currentUser && isStaffUser() && !document.getElementById('dashboard').classList.contains('hidden')) {
@@ -2088,81 +2109,26 @@
                 && firebaseConfig.databaseURL.includes('https://');
         }
 
-        function getFirebaseNamespace() {
-            return window.firebase || globalThis.firebase || null;
-        }
-
-        function isFirebaseReady(firebaseNamespace = getFirebaseNamespace()) {
-            return Boolean(
-                firebaseNamespace
-                && Array.isArray(firebaseNamespace.apps)
-                && typeof firebaseNamespace.initializeApp === 'function'
-                && typeof firebaseNamespace.database === 'function'
-                && typeof firebaseNamespace.auth === 'function'
-            );
-        }
-
-        function loadFirebaseScript(src) {
-            return new Promise((resolve, reject) => {
-                const existingScript = Array.from(document.scripts).find(script => script.src === src);
-                if (existingScript) {
-                    if (isFirebaseReady()) {
-                        resolve();
-                        return;
-                    }
-
-                    existingScript.remove();
-                }
-
-                const script = document.createElement('script');
-                script.src = src;
-                script.async = false;
-                script.dataset.firebaseSdk = src;
-                script.addEventListener('load', () => {
-                    script.dataset.firebaseLoaded = 'true';
-                    resolve();
-                }, { once: true });
-                script.addEventListener('error', () => {
-                    script.remove();
-                    reject(new Error(`Failed to load ${src}`));
-                }, { once: true });
-                document.head.appendChild(script);
-            });
-        }
-
         async function ensureFirebaseSdk() {
-            const existingFirebase = getFirebaseNamespace();
-            if (isFirebaseReady(existingFirebase)) {
-                return existingFirebase;
+            if (firebaseApi) return firebaseApi;
+            if (window.firebaseModular) {
+                firebaseApi = window.firebaseModular;
+                return firebaseApi;
             }
 
-            if (firebaseSdkPromise) {
-                return firebaseSdkPromise;
+            if (!firebaseSdkPromise) {
+                firebaseSdkPromise = new Promise((resolve, reject) => {
+                    const timeoutId = setTimeout(() => reject(new Error('Firebase modular SDK failed to load')), 10000);
+                    window.addEventListener('firebase-modular-ready', () => {
+                        clearTimeout(timeoutId);
+                        firebaseApi = window.firebaseModular;
+                        resolve(firebaseApi);
+                    }, { once: true });
+                }).catch(error => {
+                    firebaseSdkPromise = null;
+                    throw error;
+                });
             }
-
-            firebaseSdkPromise = (async () => {
-                let lastError = null;
-
-                for (const sourceGroup of FIREBASE_COMPAT_SOURCES) {
-                    try {
-                        for (const src of sourceGroup) {
-                            await loadFirebaseScript(src);
-                        }
-
-                        const firebaseNamespace = getFirebaseNamespace();
-                        if (isFirebaseReady(firebaseNamespace)) {
-                            return firebaseNamespace;
-                        }
-                    } catch (error) {
-                        lastError = error;
-                    }
-                }
-
-                throw lastError || new Error('Firebase SDK failed to load');
-            })().catch(error => {
-                firebaseSdkPromise = null;
-                throw error;
-            });
 
             return firebaseSdkPromise;
         }
@@ -2173,33 +2139,30 @@
                 return false;
             }
 
-            let firebaseNamespace = getFirebaseNamespace();
-
-            if (!isFirebaseReady(firebaseNamespace)) {
-                try {
-                    firebaseNamespace = await ensureFirebaseSdk();
-                } catch (error) {
-                    console.error(error);
-                    updateSyncStatus('Firebase SDK Missing', true);
-                    return false;
-                }
-            }
-
-            if (!isFirebaseReady(firebaseNamespace)) {
+            try {
+                firebaseApi = await ensureFirebaseSdk();
+            } catch (error) {
+                console.error(error);
                 updateSyncStatus('Firebase SDK Missing', true);
                 return false;
             }
 
-            if (!firebaseNamespace.apps.length) {
-                firebaseNamespace.initializeApp(firebaseConfig);
+            if (!firebaseApi) {
+                updateSyncStatus('Firebase SDK Missing', true);
+                return false;
             }
 
-            database = firebaseNamespace.database();
-            authClient = firebaseNamespace.auth();
-            if (firebaseNamespace.auth?.Auth?.Persistence?.LOCAL) {
-                await authClient.setPersistence(firebaseNamespace.auth.Auth.Persistence.LOCAL);
+            firebaseApp = firebaseApi.getApps().length ? firebaseApi.getApp() : firebaseApi.initializeApp(firebaseConfig);
+            database = firebaseApi.getDatabase(firebaseApp);
+            authClient = firebaseApi.getAuth(firebaseApp);
+
+            try {
+                await firebaseApi.setPersistence(authClient, firebaseApi.browserLocalPersistence);
+            } catch (error) {
+                console.warn('Firebase auth persistence could not be set', error);
             }
-            cloudRef = database.ref(FIREBASE_DATA_PATH);
+
+            cloudRef = firebaseApi.ref(database, FIREBASE_DATA_PATH);
             initializeAuthStateListener();
             return true;
         }
@@ -2212,14 +2175,14 @@
             }
 
             try {
-                const snapshot = await cloudRef.once('value');
+                const snapshot = await firebaseApi.get(cloudRef);
                 if (snapshot.exists()) {
                     data = normalizeData(snapshot.val());
                 } else {
-                    await cloudRef.set(JSON.parse(JSON.stringify(normalizeData(data))));
+                    await firebaseApi.set(cloudRef, JSON.parse(JSON.stringify(normalizeData(data))));
                 }
 
-                cloudRef.on('value', (liveSnapshot) => {
+                firebaseApi.onValue(cloudRef, (liveSnapshot) => {
                     if (!liveSnapshot.exists()) return;
                     isApplyingRemoteUpdate = true;
                     data = normalizeData(liveSnapshot.val());
@@ -2290,12 +2253,23 @@
                 pendingPush = true;
                 return;
             }
+
+            if (!authRoleLoaded) {
+                await authRoleReadyPromise;
+            }
+
+            if (!firebaseAuthUser || !currentRole) {
+                updateSyncStatus('Login Required', true);
+                alert('Login first');
+                return;
+            }
+
             pendingPush = false;
 
             try {
                 data = normalizeData(data);
                 updateSyncStatus('Syncing...');
-                await cloudRef.set(JSON.parse(JSON.stringify(data)));
+                await firebaseApi.set(cloudRef, JSON.parse(JSON.stringify(data)));
                 updateSyncStatus('Realtime Sync Active');
             } catch (error) {
                 console.error(error);
@@ -2307,6 +2281,41 @@
         function saveToStorage() {
             clearTimeout(saveTimer);
             saveTimer = setTimeout(pushDataToCloud, 250);
+        }
+
+        async function pushAttendanceToCloud(mode, dateKey) {
+            if (!await ensureRoleReadyForAttendance(mode)) {
+                return;
+            }
+
+            const path = mode === 'period'
+                ? `${FIREBASE_DATA_PATH}/periodAttendance/${dateKey}`
+                : `${FIREBASE_DATA_PATH}/attendance/${dateKey}`;
+            const value = mode === 'period'
+                ? (data.periodAttendance[dateKey] || {})
+                : (data.attendance[dateKey] || {});
+
+            try {
+                updateSyncStatus('Syncing...');
+                await firebaseApi.set(firebaseApi.ref(database, path), JSON.parse(JSON.stringify(value)));
+                updateSyncStatus('Realtime Sync Active');
+            } catch (error) {
+                console.error(error);
+                updateSyncStatus('Sync Error', true);
+                alert(`Attendance sync failed: ${error.message}`);
+            }
+        }
+
+        function saveRegularAttendance(dateKey) {
+            const timerKey = `regular:${dateKey}`;
+            clearTimeout(attendanceSaveTimers[timerKey]);
+            attendanceSaveTimers[timerKey] = setTimeout(() => pushAttendanceToCloud('regular', dateKey), 250);
+        }
+
+        function savePeriodAttendance(dateKey) {
+            const timerKey = `period:${dateKey}`;
+            clearTimeout(attendanceSaveTimers[timerKey]);
+            attendanceSaveTimers[timerKey] = setTimeout(() => pushAttendanceToCloud('period', dateKey), 250);
         }
 
         async function init() {
@@ -2323,8 +2332,39 @@
             startRegularSessionWatcher();
         }
 
+        function normalizeRole(role) {
+            const value = String(role || '').trim().toLowerCase();
+            if (value === 'class teacher' || value === 'classteacher') return 'teacher';
+            if (value === 'cr' || value === 'teacher' || value === 'faculty') return value;
+            return null;
+        }
+
+        async function fetchUserRole(uid) {
+           try {
+               const roleRef = firebaseApi.ref(database, FIREBASE_DATA_PATH + "/roles/" + uid);
+               const snap = await firebaseApi.get(roleRef);
+
+               console.log("Fetched role:", snap.val()); // DEBUG
+
+            if (!snap.exists()) {
+               return null;
+            }
+
+            return snap.val().toLowerCase().trim();
+        } catch (error) {
+             console.error("Role fetch error:", error);
+             return null;
+            }
+        }
+    
+        
+        function resolveUserRole(user = currentUser) {
+            return normalizeRole(user?.role || user?.type || currentRole);
+        }
+
         function isAdminUser(user = currentUser) {
-            return user?.type === 'cr' || user?.type === 'teacher';
+            const role = resolveUserRole(user);
+            return role === 'cr' || role === 'teacher';
         }
 
         function getStoredStaffLoginType() {
@@ -2357,7 +2397,7 @@
         }
 
         function isFacultyUser(user = currentUser) {
-            return user?.type === 'faculty';
+            return resolveUserRole(user) === 'faculty';
         }
 
         function isStaffUser(user = currentUser) {
@@ -2365,15 +2405,40 @@
         }
 
         function canManageRegularAttendance(user = currentUser) {
-            return isAdminUser(user);
+            const role = resolveUserRole(user);
+            return role === 'cr' || role === 'teacher';
         }
 
         function canManagePeriodAttendance(user = currentUser) {
-            return user?.type === 'cr' || user?.type === 'faculty';
+            const role = resolveUserRole(user);
+            return role === 'cr' || role === 'faculty';
         }
 
         function canAccessExcuseAdmin(user = currentUser) {
             return isAdminUser(user);
+        }
+
+        async function ensureRoleReadyForAttendance(mode) {
+            if (!authRoleLoaded) {
+                await authRoleReadyPromise;
+            }
+
+            if (!firebaseAuthUser || !currentRole) {
+                alert('Login first');
+                return false;
+            }
+
+            if (mode === 'regular' && !canManageRegularAttendance()) {
+                alert('Unauthorized: only CR and class teacher can mark regular attendance.');
+                return false;
+            }
+
+            if (mode === 'period' && !canManagePeriodAttendance()) {
+                alert('Unauthorized: only CR and faculty can mark period-wise attendance.');
+                return false;
+            }
+
+            return true;
         }
 
         function getAdminRoleLabel(loginType = currentUser?.type) {
@@ -2383,13 +2448,19 @@
         }
 
         function createStaffSessionUser(loginType) {
+            const role = normalizeRole(loginType);
             return {
-                type: loginType,
-                roll: loginType === 'teacher'
-                    ? 'CLASS TEACHER'
-                    : loginType === 'faculty'
-                        ? 'FACULTY'
-                        : 'CR'
+                role: role,
+                type: role,
+                uid: firebaseAuthUser?.uid || null
+            };
+        }
+
+        function createStudentSessionUser(roll) {
+            return {
+                role: 'student',
+                type: 'student',
+                roll: roll
             };
         }
 
@@ -2397,7 +2468,7 @@
             const loginTypeSelect = document.getElementById('loginType');
             if (!loginTypeSelect) return;
 
-            if (currentUser?.type === 'student') {
+            if (resolveUserRole() === 'student') {
                 loginTypeSelect.value = 'student';
             } else {
                 const storedType = getStoredStaffLoginType();
@@ -2415,22 +2486,54 @@
             }
 
             authStateListenerInitialized = true;
-            authClient.onAuthStateChanged(user => {
-                const rememberedLoginType = getStoredStaffLoginType();
+            firebaseApi.onAuthStateChanged(authClient, async user => {
+                firebaseAuthUser = user;
+                currentRole = null;
+                authRoleLoaded = false;
 
-                if (user && rememberedLoginType) {
-                    currentUser = createStaffSessionUser(rememberedLoginType);
-                    syncLoginTypeSelector();
-                    showDashboard();
+                if (!user) {
+                    authRoleLoaded = true;
+                    authRoleResolve?.();
+                    authRoleReadyPromise = Promise.resolve();
+                    if (!currentUser || isStaffUser(currentUser)) {
+                        currentUser = null;
+                        clearStoredStaffLoginType();
+                        document.getElementById('loginPage').classList.remove('hidden');
+                        document.getElementById('dashboard').classList.add('hidden');
+                        syncLoginTypeSelector();
+                    }
                     return;
                 }
 
-                if (!user && isStaffUser(currentUser)) {
+                authRoleReadyPromise = new Promise(resolve => authRoleResolve = resolve);
+
+                try {
+                    currentRole = await fetchUserRole(user.uid);
+                    if (!currentRole) {
+                        console.warn(`Blocking Firebase user ${user.uid}: no valid attendance role found.`);
+                        currentUser = null;
+                        clearStoredStaffLoginType();
+                        alert('Unauthorized user: no role assigned.');
+                        try {
+                            await firebaseApi.signOut(authClient);
+                        } catch (signOutError) {
+                            console.warn('Unable to sign out unauthorized Firebase user.', signOutError);
+                        }
+                        return;
+                    }
+
+                    currentUser = createStaffSessionUser(currentRole);
+                    storeStaffLoginType(currentRole);
+                    syncLoginTypeSelector();
+                    showDashboard();
+                } catch (error) {
+                    console.error(error);
                     currentUser = null;
                     clearStoredStaffLoginType();
-                    document.getElementById('loginPage').classList.remove('hidden');
-                    document.getElementById('dashboard').classList.add('hidden');
-                    syncLoginTypeSelector();
+                    alert('Unable to load user role. Attendance sync is blocked.');
+                } finally {
+                    authRoleLoaded = true;
+                    authRoleResolve?.();
                 }
             });
         }
@@ -2507,11 +2610,7 @@
                 }
 
                 try {
-                    await authClient.signInWithEmailAndPassword(email, password);
-                    storeStaffLoginType(loginType);
-                    currentUser = createStaffSessionUser(loginType);
-                    syncLoginTypeSelector();
-                    showDashboard();
+                    await firebaseApi.signInWithEmailAndPassword(authClient, email, password);
                 } catch (error) {
                     console.error(error);
                     showToast(`Invalid ${roleLabel} email or password!`);
@@ -2522,7 +2621,21 @@
                     showToast('Invalid roll number!');
                     return;
                 }
-                currentUser = { type: 'student', roll: roll };
+
+                if (authClient && firebaseAuthUser) {
+                    try {
+                        await firebaseApi.signOut(authClient);
+                    } catch (error) {
+                        console.warn('Unable to clear existing Firebase staff session before student login.', error);
+                    }
+                }
+
+                firebaseAuthUser = null;
+                currentRole = null;
+                authRoleLoaded = true;
+                authRoleReadyPromise = Promise.resolve();
+                clearStoredStaffLoginType();
+                currentUser = createStudentSessionUser(roll);
                 showDashboard();
             }
         }
@@ -2531,13 +2644,17 @@
         async function handleLogout() {
             if (isStaffUser() && authClient) {
                 try {
-                    await authClient.signOut();
+                    await firebaseApi.signOut(authClient);
                 } catch (error) {
                     console.error(error);
                 }
             }
 
             currentUser = null;
+            firebaseAuthUser = null;
+            currentRole = null;
+            authRoleLoaded = true;
+            authRoleReadyPromise = Promise.resolve();
             clearStoredStaffLoginType();
             document.getElementById('loginPage').classList.remove('hidden');
             document.getElementById('dashboard').classList.add('hidden');
@@ -3055,9 +3172,8 @@
             document.getElementById('lateCount').textContent = fullPresentDays;
         }
 
-        function setStatus(roll, status) {
-            if (!canManageRegularAttendance()) {
-                showToast('Faculty cannot edit regular attendance.');
+        async function setStatus(roll, status) {
+            if (!await ensureRoleReadyForAttendance('regular')) {
                 return;
             }
 
@@ -3074,13 +3190,12 @@
 
             const dateKey = formatDateKey(selectedDate);
             getRegularAttendanceForDate(dateKey)[roll] = status;
-            saveToStorage();
+            saveRegularAttendance(dateKey);
             renderAttendanceList(document.getElementById('searchInput').value);
         }
 
-        function setPeriodStatus(roll, periodIndex, status) {
-            if (!canManagePeriodAttendance()) {
-                showToast('You do not have permission to edit period-wise attendance.');
+        async function setPeriodStatus(roll, periodIndex, status) {
+            if (!await ensureRoleReadyForAttendance('period')) {
                 return;
             }
 
@@ -3101,19 +3216,18 @@
             const periods = getStudentPeriodRecord(dateKey, roll);
             periods[periodIndex] = status;
             dayAttendance[roll] = periods;
-            saveToStorage();
+            savePeriodAttendance(dateKey);
             renderPeriodAttendanceList(document.getElementById('searchInput').value);
         }
 
-        function markAllPresent() {
+        async function markAllPresent() {
             const dateKey = formatDateKey(selectedDate);
             if (isSundayHoliday(selectedDate)) {
                 showToast('Attendance cannot be marked on Sundays.');
                 return;
             }
             if (activeAttendanceMode === 'period') {
-                if (!canManagePeriodAttendance()) {
-                    showToast('You do not have permission to edit period-wise attendance.');
+                if (!await ensureRoleReadyForAttendance('period')) {
                     return;
                 }
                 const editablePeriodIndexes = getActiveEditablePeriodIndexes(selectedDate);
@@ -3131,8 +3245,7 @@
                     dayAttendance[student.roll] = periods;
                 });
             } else {
-                if (!canManageRegularAttendance()) {
-                    showToast('Faculty cannot edit regular attendance.');
+                if (!await ensureRoleReadyForAttendance('regular')) {
                     return;
                 }
                 if (!isRegularAttendanceEditable()) {
@@ -3143,20 +3256,23 @@
                 const dayAttendance = getRegularAttendanceForDate(dateKey);
                 data.students.forEach(student => dayAttendance[student.roll] = 'present');
             }
-            saveToStorage();
+            if (activeAttendanceMode === 'period') {
+                savePeriodAttendance(dateKey);
+            } else {
+                saveRegularAttendance(dateKey);
+            }
             renderAttendanceView();
             showToast(activeAttendanceMode === 'period' ? 'All students marked present for the active period!' : 'All students marked present!');
         }
 
-        function markAllAbsent() {
+        async function markAllAbsent() {
             const dateKey = formatDateKey(selectedDate);
             if (isSundayHoliday(selectedDate)) {
                 showToast('Attendance cannot be marked on Sundays.');
                 return;
             }
             if (activeAttendanceMode === 'period') {
-                if (!canManagePeriodAttendance()) {
-                    showToast('You do not have permission to edit period-wise attendance.');
+                if (!await ensureRoleReadyForAttendance('period')) {
                     return;
                 }
                 const editablePeriodIndexes = getActiveEditablePeriodIndexes(selectedDate);
@@ -3174,8 +3290,7 @@
                     dayAttendance[student.roll] = periods;
                 });
             } else {
-                if (!canManageRegularAttendance()) {
-                    showToast('Faculty cannot edit regular attendance.');
+                if (!await ensureRoleReadyForAttendance('regular')) {
                     return;
                 }
                 if (!isRegularAttendanceEditable()) {
@@ -3186,7 +3301,11 @@
                 const dayAttendance = getRegularAttendanceForDate(dateKey);
                 data.students.forEach(student => dayAttendance[student.roll] = 'absent');
             }
-            saveToStorage();
+            if (activeAttendanceMode === 'period') {
+                savePeriodAttendance(dateKey);
+            } else {
+                saveRegularAttendance(dateKey);
+            }
             renderAttendanceView();
             showToast(activeAttendanceMode === 'period' ? 'All students marked absent for the active period!' : 'All students marked absent!');
         }
@@ -3195,19 +3314,13 @@
             renderAttendanceView(document.getElementById('searchInput').value);
         }
 
-        function saveAttendance() {
+        async function saveAttendance() {
             if (isSundayHoliday(selectedDate)) {
                 showToast('Attendance cannot be marked on Sundays.');
                 return;
             }
 
-            if (activeAttendanceMode === 'regular' && !canManageRegularAttendance()) {
-                showToast('Faculty cannot edit regular attendance.');
-                return;
-            }
-
-            if (activeAttendanceMode === 'period' && !canManagePeriodAttendance()) {
-                showToast('You do not have permission to edit period-wise attendance.');
+            if (!await ensureRoleReadyForAttendance(activeAttendanceMode)) {
                 return;
             }
 
@@ -3217,7 +3330,12 @@
                 return;
             }
 
-            saveToStorage();
+            const dateKey = formatDateKey(selectedDate);
+            if (activeAttendanceMode === 'period') {
+                savePeriodAttendance(dateKey);
+            } else {
+                saveRegularAttendance(dateKey);
+            }
             showToast(activeAttendanceMode === 'period' ? 'Attendance saved for period-wise mode!' : 'Attendance saved successfully!');
         }
 
@@ -4235,7 +4353,7 @@
                 try {
                     updateSyncStatus('Syncing...');
                     const payload = JSON.parse(JSON.stringify(normalizeData(data)));
-                    await cloudRef.set(payload);
+                    await firebaseApi.set(cloudRef, payload);
                     updateSyncStatus('Realtime Sync Active');
                     showToast('✅ Excuse submitted!');
                 } catch (error) {
