@@ -1528,7 +1528,7 @@
             "25HU1A05E1": "C.SREEKANTH",
             "25HU1A05E2": "N.SRI ANJALI",
             "25HU1A05E3": "P.SRUTHI PRASANTHI",
-            "25HU1A05E4": "B.SUDHA RANI",
+            "25HU1A05E4": "SUDHA RANI",
             "25HU1A05E5": "A.SUHASH",
             "25HU1A05E6": "C.SUJITH KUMAR NAIDU",
             "25HU1A05E7": "K.SUJITHA",
@@ -1708,6 +1708,36 @@
             }
 
             return data.attendance[dateKey];
+        }
+
+        function getStoredRegularStatus(dateKey, roll) {
+            const dayAttendance = getRegularAttendanceForDate(dateKey);
+            return dayAttendance[roll] || 'absent';
+        }
+
+        function applyExcuseAttendanceStatus(excuse, status = excuse?.status) {
+            if (!excuse?.date || !excuse?.roll || isSundayHolidayDateKey(excuse.date)) {
+                return;
+            }
+
+            const dayAttendance = getRegularAttendanceForDate(excuse.date);
+
+            if (status === 'approved') {
+                dayAttendance[excuse.roll] = 'present';
+                return;
+            }
+
+            if (status === 'pending') {
+                if (!excuse.previousAttendanceStatus) {
+                    excuse.previousAttendanceStatus = getStoredRegularStatus(excuse.date, excuse.roll);
+                }
+                dayAttendance[excuse.roll] = 'late';
+                return;
+            }
+
+            if (status === 'rejected') {
+                dayAttendance[excuse.roll] = excuse.previousAttendanceStatus || 'absent';
+            }
         }
 
         function getPeriodAttendanceForDate(dateKey) {
@@ -4356,13 +4386,14 @@
                 date: date,
                 reason: reason,
                 time: new Date().toLocaleString(),
-                status: 'pending'
+                status: 'pending',
+                previousAttendanceStatus: getStoredRegularStatus(date, roll)
             };
 
             data.excuses.push(newExcuse);
+            applyExcuseAttendanceStatus(newExcuse, 'pending');
             closeModal('excuseModal');
-            renderExcuses();
-            updateExcuseBadge();
+            refreshCurrentView();
 
             // Push directly to Firebase without debounce to prevent race condition
             if (cloudRef) {
@@ -4416,13 +4447,29 @@
             `).join('');
         }
 
-        function updateExcuseStatus(id, status) {
+        async function updateExcuseStatus(id, status) {
             const excuse = data.excuses.find(e => e.id === id);
             if (excuse) {
                 excuse.status = status;
-                saveToStorage();
-                renderExcuses();
-                updateExcuseBadge();
+                applyExcuseAttendanceStatus(excuse, status);
+                refreshCurrentView();
+
+                if (cloudRef) {
+                    try {
+                        updateSyncStatus('Syncing...');
+                        const payload = JSON.parse(JSON.stringify(normalizeData(data)));
+                        await firebaseApi.set(cloudRef, payload);
+                        updateSyncStatus('Realtime Sync Active');
+                    } catch (error) {
+                        console.error(error);
+                        updateSyncStatus('Sync Error', true);
+                        showToast(`Excuse ${status}, but sync failed.`);
+                        return;
+                    }
+                } else {
+                    saveToStorage();
+                }
+
                 showToast(`Excuse ${status}!`);
             }
         }
