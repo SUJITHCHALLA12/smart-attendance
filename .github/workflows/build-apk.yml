@@ -1,0 +1,41 @@
+name: Build APK
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+      - name: Build release APK
+        working-directory: android
+        run: gradle assembleRelease --no-daemon
+      - name: Rename APK
+        working-directory: android
+        run: cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/smart-attendance.apk
+      - name: Publish to Releases
+        uses: ncipollo/release-action@v1
+        with:
+          tag: latest
+          name: Latest APK build
+          body: |
+            Smart Attendance Android app — the website wrapped in a native app shell.
+            Debug-signed — for customer test installs, not for Play Store distribution.
+            The app loads the live site, so website updates appear instantly without reinstalling.
+          allowUpdates: true
+          replacesArtifacts: true
+          makeLatest: true
+          artifacts: "android/app/build/outputs/apk/release/smart-attendance.apk"
