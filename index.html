@@ -4415,7 +4415,8 @@
 
         function renderExcuses() {
             const list = document.getElementById('excusesList');
-            let excuses = data.excuses;
+            // Newest excuses first (latest raised shows at the top)
+            let excuses = [...data.excuses].sort((a, b) => (b.id || 0) - (a.id || 0));
 
             if (currentUser.type === 'student') {
                 excuses = excuses.filter(e => e.roll === currentUser.roll);
