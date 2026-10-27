@@ -6,6 +6,16 @@
     <title>Smart Attendance | Classroom Attendance Management App</title>
     <meta name="description" content="Smart Attendance — mark and track classroom attendance online. CRs mark in seconds; students and teachers view live records, reports and excuse requests.">
     <meta name="keywords" content="smart attendance, attendance management system, classroom attendance app, mark attendance online, student attendance tracker, online attendance register">
+    <link rel="canonical" href="https://smart-attendance-cr.vercel.app/">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Smart Attendance">
+    <meta property="og:title" content="Smart Attendance | Classroom Attendance Management App">
+    <meta property="og:description" content="Smart Attendance — mark and track classroom attendance online. CRs mark in seconds; students and teachers view live records, reports and excuse requests.">
+    <meta property="og:url" content="https://smart-attendance-cr.vercel.app/">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Smart Attendance | Classroom Attendance Management App">
+    <meta name="twitter:description" content="Smart Attendance — mark and track classroom attendance online. CRs mark in seconds; students and teachers view live records, reports and excuse requests.">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230dbf67'/%3E%3Cpath d='M18 34l10 10 18-20' stroke='white' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
     <style>
         * {
             margin: 0;
@@ -1820,6 +1830,13 @@
             return isSundayHoliday(parseDateKey(dateKey));
         }
 
+        // Escape user-entered text before it is interpolated into innerHTML,
+        // so stored values (student names, rolls, excuse reasons) render as
+        // text and cannot inject markup or script into other users' dashboards.
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+        }
+
         function formatTimeLabel(hour, minute) {
             const suffix = hour >= 12 ? 'PM' : 'AM';
             const normalizedHour = hour % 12 || 12;
@@ -3175,7 +3192,7 @@
                             <div class="student-avatar">${roll.slice(-3)}</div>
                             <div>
                                 <div style="font-weight: 600;">${roll}</div>
-                                <div style="font-size: 0.85rem; color: var(--text-light);">${student.name}</div>
+                                <div style="font-size: 0.85rem; color: var(--text-light);">${escapeHtml(student.name)}</div>
                                 <div class="period-summary">${isSundayHoliday(selectedDate) ? 'Sunday holiday' : `${presentCount}/${academicCount} academic periods present`}</div>
                             </div>
                         </div>
@@ -3546,7 +3563,7 @@
                 let studentPresentPeriods = 0;
                 let studentAbsentPeriods = 0;
 
-                bodyHtml += `<tr><td>${student.roll}</td><td>${student.name}</td>`;
+                bodyHtml += `<tr><td>${escapeHtml(student.roll)}</td><td>${escapeHtml(student.name)}</td>`;
 
                 days.forEach(dateKey => {
                     if (isSundayHolidayDateKey(dateKey)) {
@@ -3559,7 +3576,7 @@
                         const markedCount = getPeriodMarkedCount(periods);
                         studentPresentPeriods += presentCount;
                         studentAbsentPeriods += markedCount - presentCount;
-                        bodyHtml += `<td><button class="period-count-btn" onclick="openPeriodDetails('${dateKey}', '${student.roll}')">${presentCount}</button></td>`;
+                        bodyHtml += `<td><button class="period-count-btn" onclick="openPeriodDetails('${dateKey}', '${escapeHtml(student.roll)}')">${presentCount}</button></td>`;
                     } else {
                         bodyHtml += '<td>-</td>';
                     }
@@ -4294,8 +4311,8 @@
                 return `
                 <div class="student-list-item">
                     <div>
-                        <div style="font-weight: 500;">${student.roll}</div>
-                        <div style="font-size: 0.8rem; color: var(--text-light);">${student.name}</div>
+                        <div style="font-weight: 500;">${escapeHtml(student.roll)}</div>
+                        <div style="font-size: 0.8rem; color: var(--text-light);">${escapeHtml(student.name)}</div>
                     </div>
                     <button class="icon-btn delete" onclick="removeStudent('${roll}')" title="Remove">🗑️</button>
                 </div>
@@ -4432,11 +4449,11 @@
             list.innerHTML = excuses.map(excuse => `
                 <div class="excuse-item">
                     <div class="header">
-                        <span class="roll">${excuse.roll}</span>
+                        <span class="roll">${escapeHtml(excuse.roll)}</span>
                         <span class="time">${excuse.time}</span>
                     </div>
-                    <div style="font-size: 0.9rem; margin-bottom: 5px;"><strong>Date:</strong> ${excuse.date}</div>
-                    <div class="reason">${excuse.reason}</div>
+                    <div style="font-size: 0.9rem; margin-bottom: 5px;"><strong>Date:</strong> ${escapeHtml(excuse.date)}</div>
+                    <div class="reason">${escapeHtml(excuse.reason)}</div>
                     ${isAdminUser() ? `
                         <div style="margin-top: 10px;">
                             <button class="btn btn-success btn-sm" onclick="updateExcuseStatus(${excuse.id}, 'approved')">✅ Approve</button>
