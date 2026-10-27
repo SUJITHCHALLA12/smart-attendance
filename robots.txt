@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://smart-attendance-cr.vercel.app/sitemap.xml
